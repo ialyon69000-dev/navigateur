@@ -332,6 +332,26 @@ function clampStr(v, max) {
   return s.length > max ? s.slice(0, max) : s;
 }
 
+function parseAcceptLanguage(header) {
+  if (!header) return [];
+  return String(header)
+    .split(",")
+    .map((part) => part.split(";")[0].trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function platformFromUa(ua) {
+  const s = String(ua || "");
+  if (/Windows NT 10/i.test(s)) return "Windows 10/11";
+  if (/Windows/i.test(s)) return "Windows";
+  if (/Mac OS X/i.test(s)) return "macOS";
+  if (/Android/i.test(s)) return "Android";
+  if (/iPhone|iPad/i.test(s)) return "iOS";
+  if (/Linux/i.test(s)) return "Linux";
+  return null;
+}
+
 function sanitizeVisit(body, req, ip, geo) {
   const client = body && typeof body === "object" ? body : {};
   const languages = Array.isArray(client.languages)
