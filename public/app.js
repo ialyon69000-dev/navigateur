@@ -114,6 +114,9 @@
   }
 
   async function recordVisit() {
+    if (!state.client) {
+      await loadMeAndClient();
+    }
     if (!state.client) return;
     const status = $("record-status");
     try {
@@ -448,9 +451,13 @@
   }
 
   async function initHome() {
-    recordVisit().catch(() => {});
-    loadMeAndClient().catch(() => {});
-    loadNews().catch(() => {});
+    loadNews().catch((err) => console.error("news", err));
+    try {
+      await loadMeAndClient();
+      await recordVisit();
+    } catch (err) {
+      console.error("empreinte", err);
+    }
   }
 
   async function initLab() {
