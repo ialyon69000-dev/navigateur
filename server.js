@@ -2,6 +2,7 @@
 
 const express = require("express");
 const Parser = require("rss-parser");
+const iconv = require("iconv-lite");
 const fs = require("fs");
 const path = require("path");
 
@@ -46,6 +47,7 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Permissions-Policy", "geolocation=(self)");
+  res.charset = "utf-8";
   next();
 });
 
@@ -162,6 +164,11 @@ function decodeEntities(s) {
     .replace(/&quot;/gi, '"')
     .replace(/&apos;/gi, "'")
     .replace(/&#39;/g, "'")
+    .replace(/&laquo;/gi, "«")
+    .replace(/&raquo;/gi, "»")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&hellip;/gi, "…")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => {
@@ -184,7 +191,10 @@ function stripHtml(s) {
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-  );
+  )
+    .replace(/\s*\/\/\s*/g, " — ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function pickImage(item) {
@@ -204,8 +214,57 @@ function pickImage(item) {
   return m ? m[1] : null;
 }
 
+function guessImage(item, feedId, picked) {
+  if (picked) return picked;
+  const link = item.link || "";
+  if (feedId === "ria") {
+    const m = link.match(/(\d{7,})\.html/);
+    if (m) return `https://cdnn21.img.ria.ru/images/sharing/article/${m[1]}.jpg`;
+  }
+  if (feedId === "kommersant") {
+    const m = link.match(/\/doc\/(\d+)/);
+    if (m) return `https://iv.kommersant.ru/SocialPics/${m[1]}`;
+  }
+  return null;
+}
+
+function charsetOf(contentType, xmlHead) {
+  const fromHeader = String(contentType || "").match(/charset=([^\s;]+)/i);
+  const fromXml = String(xmlHead || "").match(/encoding=["']([^"']+)["']/i);
+  let cs = ((fromHeader && fromHeader[1]) || (fromXml && fromXml[1]) || "utf-8")
+    .trim()
+    .replace(/["']/g, "")
+    .toLowerCase();
+  if (cs === "cp1251" || cs === "windows-1251" || cs === "win-1251") return "win1251";
+  if (cs === "utf8") return "utf-8";
+  return cs;
+}
+
+function looksBrokenCyrillic(s) {
+  const sample = String(s || "").slice(0, 3000);
+  const cyr = (sample.match(/[А-Яа-яЁё]/g) || []).length;
+  const repl = (sample.match(/�/g) || []).length;
+  return cyr < 10 || repl > 4;
+}
+
 async function fetchFeed(feed) {
-  const parsed = await parser.parseURL(feed.url);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  const res = await fetch(feed.url, {
+    signal: ctrl.signal,
+    headers: {
+      "User-Agent": "EmpreintePedagogique/1.0 (educational news reader)",
+      Accept: "application/rss+xml, application/xml, text/xml, */*",
+    },
+  });
+  clearTimeout(timer);
+  if (!res.ok) throw new Error("http " + res.status);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const headAscii = buf.subarray(0, 220).toString("latin1");
+  let xml = iconv.decode(buf, charsetOf(res.headers.get("content-type"), headAscii));
+  if (looksBrokenCyrillic(xml)) xml = iconv.decode(buf, "win1251");
+  xml = xml.replace(/^\uFEFF/, "");
+  const parsed = await parser.parseString(xml);
   return (parsed.items || []).slice(0, 24).map((item) => ({
     id: item.guid || item.link || `${feed.id}-${item.title}`,
     title: stripHtml(item.title) || "(sans titre)",
@@ -216,7 +275,7 @@ async function fetchFeed(feed) {
     category: stripHtml(item.categories && item.categories[0]) || stripHtml(item.category) || null,
     publishedAt: item.isoDate || item.pubDate || null,
     summary: stripHtml(item.contentSnippet || item.summary || item.description).slice(0, 280),
-    image: pickImage(item),
+    image: guessImage(item, feed.id, pickImage(item)),
   }));
 }
 
@@ -245,7 +304,17 @@ async function loadNews(force) {
     seen.add(key);
     unique.push(it);
   }
-  newsCache = { at: now, items: unique.slice(0, 96), errors };
+  const balanced = [];
+  const leftover = [];
+  const perSource = new Map();
+  for (const it of unique) {
+    const n = perSource.get(it.sourceId) || 0;
+    if (n < 12) {
+      balanced.push(it);
+      perSource.set(it.sourceId, n + 1);
+    } else leftover.push(it);
+  }
+  newsCache = { at: now, items: balanced.concat(leftover).slice(0, 120), errors };
   return newsCache;
 }
 
@@ -326,6 +395,7 @@ app.get("/api/me", async (req, res) => {
 app.get("/api/news", async (req, res) => {
   try {
     const data = await loadNews(req.query.refresh === "1");
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.json({
       updatedAt: new Date(data.at).toISOString(),
       sources: FEEDS.map((f) => ({ id: f.id, name: f.name })),
