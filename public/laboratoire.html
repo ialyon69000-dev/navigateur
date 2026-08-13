@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Laboratoire — ОКНО</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23110f0c' width='32' height='32'/%3E%3Crect x='5' y='6' width='22' height='20' fill='none' stroke='%23d4a017' stroke-width='2'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="lab">
+  <div class="grain" aria-hidden="true"></div>
+  <header class="topbar">
+    <p class="topbar-msg">
+      <span class="pulse"></span>
+      Journal automatique — chaque ouverture de la page d’accueil écrit une ligne.
+      <a href="/">Retour au journal</a>
+    </p>
+  </header>
+
+  <main class="lab">
+    <p class="kicker">Journal des empreintes</p>
+    <h1>Laboratoire</h1>
+    <p>
+      Chaque visiteur qui a cliqué «&nbsp;Voir et enregistrer ma visite&nbsp;» apparaît ici.
+      C’est exactement le fichier JSON que le serveur écrit sur le disque.
+      Sur un hébergeur gratuit, ce fichier est souvent <em>éphémère</em> (perdu au redémarrage).
+    </p>
+    <p id="visit-count" class="meta">Chargement…</p>
+
+    <div class="lab-actions">
+      <button type="button" class="btn btn-ghost" id="btn-refresh">Actualiser</button>
+      <button type="button" class="btn btn-solid" id="btn-download">Télécharger visits.json</button>
+      <button type="button" class="btn btn-danger" id="btn-clear">Vider le journal</button>
+    </div>
+
+    <p id="lab-empty" class="news-status">Aucune visite enregistrée pour l’instant.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>IP</th>
+            <th>Géo IP</th>
+            <th>Langue</th>
+            <th>Clavier</th>
+            <th>Écran</th>
+            <th>GPS</th>
+            <th>Fuseau</th>
+          </tr>
+        </thead>
+        <tbody id="visit-rows"></tbody>
+      </table>
+    </div>
+
+    <h2 class="kicker" style="margin-top:1.6rem">Brut — visits.json</h2>
+    <pre class="json-block" id="json-view">[]</pre>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

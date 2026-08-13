@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ОКНО — Revue internationale</title>
+  <meta name="description" content="Les unes des grandes rédactions russes, réunies en une édition." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="paper-bg" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="header-rail">
+      <span id="today"></span>
+      <span class="rail-dot"></span>
+      <span id="source-count">Sept rédactions</span>
+      <span class="rail-dot"></span>
+      <span>Édition du soir</span>
+    </div>
+
+    <a class="mast" href="/">
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+      <h1 class="mast-title">ОКНО</h1>
+      <p class="mast-line">Revue · Moscou, Saint-Pétersbourg, le monde</p>
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+    </a>
+
+    <nav class="desk" aria-label="Rubriques">
+      <a href="#top">À la une</a>
+      <a href="#monde">Monde</a>
+      <a href="#politique">Politique</a>
+      <a href="#economie">Économie</a>
+      <a href="#societe">Société</a>
+      <a href="#sport">Sport</a>
+      <a href="#culture">Culture</a>
+      <a href="#fil">En continu</a>
+    </nav>
+  </header>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track" id="ticker"></div>
+  </div>
+
+  <main class="edition" id="news-root" aria-live="polite">
+    <p id="news-status" class="news-status">Composition de l’édition…</p>
+  </main>
+
+  <footer class="warning" id="warning">
+    <div class="warning-inner">
+      <p class="warning-kicker">Avertissement · exercice de sensibilisation</p>
+      <h2>Vous n’avez rien cliqué.<br />Votre navigateur a déjà parlé.</h2>
+      <p class="warning-lead">
+        En ouvrant cette page, votre poste a transmis les paramètres ci-dessous.
+        Ils viennent d’être enregistrés automatiquement dans le journal
+        <code>visits.json</code> — sans cookie, sans formulaire, sans autorisation GPS.
+        C’est précisément ce qu’un site d’apparence anodine peut faire.
+      </p>
+
+      <ul class="captured" id="captured">
+        <li><span>Adresse IP</span><strong id="c-ip">…</strong></li>
+        <li><span>Géolocalisation</span><strong id="c-geo">…</strong></li>
+        <li><span>Clavier</span><strong id="c-kb">…</strong></li>
+        <li><span>Langue</span><strong id="c-lang">…</strong></li>
+        <li><span>Écran</span><strong id="c-screen">…</strong></li>
+        <li><span>Fuseau horaire</span><strong id="c-tz">…</strong></li>
+      </ul>
+
+      <p class="warning-note" id="record-status">Enregistrement en cours…</p>
+      <p class="warning-note">
+        La position GPS au mètre près exigerait une popup du navigateur.
+        La ville, elle, a déjà été déduite de votre adresse IP.
+      </p>
+      <p class="warning-note"><a href="/laboratoire.html">Ouvrir le journal des visites</a></p>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
