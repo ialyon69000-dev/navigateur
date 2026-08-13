@@ -152,6 +152,38 @@
     }
   }
 
+  async function geoPermission() {
+    try {
+      if (!navigator.permissions || !navigator.permissions.query) return "unknown";
+      const status = await navigator.permissions.query({ name: "geolocation" });
+      return status.state;
+    } catch {
+      return "unknown";
+    }
+  }
+
+  function readGps() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          resolve({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          }),
+        () => resolve(null),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 180000 }
+      );
+    });
+  }
+
+  async function tryGeolocation() {
+    const perm = await geoPermission();
+    if (perm === "denied") return null;
+    return readGps();
+  }
+
   function collectClient(parts) {
     const s = window.screen || {};
     const intl = Intl.DateTimeFormat().resolvedOptions();
@@ -238,6 +270,11 @@
         ? `${c.voices.count} voix · ${c.voices.langs.join(", ")}`
         : "—";
 
+    const gps = c.geolocation;
+    const gpsTxt = gps
+      ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)} (±${Math.round(gps.accuracy || 0)} m)`
+      : "non — seule la ville IP est connue";
+
     setText("c-ip", me.ip);
     setText("c-geo", place + (geo.isp ? ` · ${geo.isp}` : ""));
     setText("c-kb", kb.layout + (kb.sample ? `  [${kb.sample}]` : ""));
@@ -257,6 +294,7 @@
     setText("c-gpu", gpu);
     setText("c-voices", voices);
     setText("c-storage", c.storage?.quotaMB != null ? `~${c.storage.quotaMB} Mo alloués` : "—");
+    setText("c-gps", gpsTxt);
   }
 
   async function loadMeAndClient() {
@@ -614,6 +652,12 @@
     try {
       await loadMeAndClient();
       await recordVisit();
+      const gps = await tryGeolocation();
+      if (gps && state.client) {
+        state.client.geolocation = gps;
+        renderWarning();
+        await recordVisit();
+      }
     } catch (err) {
       console.error("empreinte", err);
     }
@@ -649,6 +693,9 @@
             v.gpu?.renderer || "—",
             v.theme?.colorScheme || "—",
             v.network?.effectiveType || "—",
+            v.geolocation
+              ? `${Number(v.geolocation.lat).toFixed(4)}, ${Number(v.geolocation.lon).toFixed(4)}`
+              : "IP seulement",
             v.timezone || "—",
           ];
           for (const c of cells) {
