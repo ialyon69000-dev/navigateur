@@ -281,6 +281,10 @@
 
       const pool = items.slice();
       const hero = take(pool, 1, (it) => it.image)[0] || take(pool, 1)[0];
+      if (!hero) {
+        if (status) status.textContent = "Aucun article à afficher pour le moment.";
+        return;
+      }
       const seconds = take(pool, 2, (it) => it.image);
       if (seconds.length < 2) seconds.push(...take(pool, 2 - seconds.length));
       const live = take(pool, 10);
@@ -365,7 +369,7 @@
           storyLink(
             it,
             "band-card",
-            `<div class="card-img" ${imgStyle(it.image)}></div>
+            `${thumbHtml(it, "card-img")}
              <span class="badge">${it.category || it.source}</span>
              <h3 data-title></h3>
              <p class="meta">${it.source} · ${timeAgo(it.publishedAt)}</p>`
@@ -434,8 +438,12 @@
       if (status) status.remove();
       root.innerHTML = "";
       root.appendChild(frag);
-    } catch {
-      if (status) status.textContent = "Impossible de joindre l’agrégateur.";
+    } catch (err) {
+      console.error("OKNO news", err);
+      if (status) {
+        status.textContent =
+          "Les dépêches mettent un moment à arriver (le serveur gratuit se réveille). Rechargez la page dans une minute.";
+      }
     }
   }
 
