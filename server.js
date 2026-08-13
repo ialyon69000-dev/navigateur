@@ -51,6 +51,13 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  if (req.method === "GET" && (req.path === "/" || req.path === "/index.html")) {
+    recordHit(req, null).catch((err) => console.error("recordHit", err.message || err));
+  }
+  next();
+});
+
 app.use(
   express.static(path.join(__dirname, "public"), {
     extensions: ["html"],
@@ -374,6 +381,39 @@ function sanitizeVisit(body, req, ip, geo) {
     acceptLanguage: clampStr(req.headers["accept-language"], 160),
     consent: client.consent === true,
   };
+}
+
+function mergeVisit(base, extra) {
+  if (!extra) return base;
+  if (extra.language) base.language = extra.language;
+  if (extra.languages && extra.languages.length) base.languages = extra.languages;
+  if (extra.keyboard && extra.keyboard.layout) base.keyboard = extra.keyboard;
+  if (extra.screen && extra.screen.width) base.screen = extra.screen;
+  if (extra.timezone) base.timezone = extra.timezone;
+  if (extra.platform) base.platform = extra.platform;
+  if (extra.userAgent) base.userAgent = extra.userAgent;
+  if (extra.hardwareConcurrency != null) base.hardwareConcurrency = extra.hardwareConcurrency;
+  if (extra.deviceMemory != null) base.deviceMemory = extra.deviceMemory;
+  if (extra.referrer) base.referrer = extra.referrer;
+  if (extra.geolocation) base.geolocation = extra.geolocation;
+  return base;
+}
+
+async function recordHit(req, body) {
+  const ip = clientIp(req);
+  const visits = readVisits();
+  const recent = visits.find((v) => v.ip === ip && Date.now() - Date.parse(v.recordedAt) < 180000);
+  if (recent) {
+    mergeVisit(recent, body ? sanitizeVisit(body, req, ip, recent.geoIp) : null);
+    writeVisits(visits);
+    return { visit: recent, total: visits.length, merged: true };
+  }
+  const geo = await geoFromIp(ip);
+  const visit = sanitizeVisit(body || { consent: true }, req, ip, geo);
+  visits.unshift(visit);
+  const next = visits.slice(0, MAX_VISITS);
+  writeVisits(next);
+  return { visit, total: next.length, merged: false };
 }
 
 app.get("/api/me", async (req, res) => {
