@@ -448,13 +448,9 @@
   }
 
   async function initHome() {
-    await Promise.all([loadMeAndClient(), loadNews()]);
-    if (!sessionStorage.getItem("okno-recorded")) {
-      await recordVisit();
-    } else if ($("record-status")) {
-      $("record-status").textContent =
-        "Cette session a déjà été écrite dans visits.json (un enregistrement par onglet).";
-    }
+    recordVisit().catch(() => {});
+    loadMeAndClient().catch(() => {});
+    loadNews().catch(() => {});
   }
 
   async function initLab() {

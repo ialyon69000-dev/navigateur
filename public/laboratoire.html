@@ -25,9 +25,9 @@
     <p class="kicker">Journal des empreintes</p>
     <h1>Laboratoire</h1>
     <p>
-      Chaque visiteur qui a cliqué «&nbsp;Voir et enregistrer ma visite&nbsp;» apparaît ici.
-      C’est exactement le fichier JSON que le serveur écrit sur le disque.
-      Sur un hébergeur gratuit, ce fichier est souvent <em>éphémère</em> (perdu au redémarrage).
+      Chaque ouverture de la page d’accueil écrit une ligne ici — sur le serveur Render,
+      pas dans le fichier GitHub. Rechargez après une visite.
+      Sur le plan gratuit, le fichier est <em>vidé</em> si le site s’endort ou redéploie.
     </p>
     <p id="visit-count" class="meta">Chargement…</p>
 
@@ -63,5 +63,5 @@
 
   <div id="toast" class="toast" hidden></div>
   <script src="/app.js"></script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2aa396158acac0b',t:'MTc4NjY1MDM2OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
