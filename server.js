@@ -352,6 +352,29 @@ function platformFromUa(ua) {
   return null;
 }
 
+function sanitizeHints(raw) {
+  const h = raw && typeof raw === "object" ? raw : {};
+  const brands = Array.isArray(h.brands)
+    ? h.brands.map((x) => clampStr(x, 60)).filter(Boolean).slice(0, 8)
+    : [];
+  const full = Array.isArray(h.fullVersionList)
+    ? h.fullVersionList.map((x) => clampStr(x, 80)).filter(Boolean).slice(0, 8)
+    : [];
+  return {
+    available: Boolean(h.available),
+    mobile: typeof h.mobile === "boolean" ? h.mobile : null,
+    platform: clampStr(h.platform, 40),
+    platformVersion: clampStr(h.platformVersion, 40),
+    architecture: clampStr(h.architecture, 20),
+    bitness: clampStr(h.bitness, 8),
+    model: clampStr(h.model, 60),
+    uaFullVersion: clampStr(h.uaFullVersion, 40),
+    brands,
+    fullVersionList: full,
+    wow64: typeof h.wow64 === "boolean" ? h.wow64 : null,
+  };
+}
+
 function sanitizeVisit(body, req, ip, geo) {
   const client = body && typeof body === "object" ? body : {};
   const languages = Array.isArray(client.languages)
@@ -360,6 +383,13 @@ function sanitizeVisit(body, req, ip, geo) {
   const screen = client.screen && typeof client.screen === "object" ? client.screen : {};
   const keyboard = client.keyboard && typeof client.keyboard === "object" ? client.keyboard : {};
   const geoGps = client.geolocation && typeof client.geolocation === "object" ? client.geolocation : {};
+  const theme = client.theme && typeof client.theme === "object" ? client.theme : {};
+  const network = client.network && typeof client.network === "object" ? client.network : {};
+  const gpu = client.gpu && typeof client.gpu === "object" ? client.gpu : {};
+  const voices = client.voices && typeof client.voices === "object" ? client.voices : {};
+  const intl = client.intl && typeof client.intl === "object" ? client.intl : {};
+  const storage = client.storage && typeof client.storage === "object" ? client.storage : {};
+  const fromHeader = parseAcceptLanguage(req.headers["accept-language"]);
 
   return {
     id: `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
@@ -375,8 +405,8 @@ function sanitizeVisit(body, req, ip, geo) {
             source: "navigator.geolocation",
           }
         : null,
-    language: clampStr(client.language, 20),
-    languages,
+    language: clampStr(client.language, 20) || fromHeader[0] || null,
+    languages: languages.length ? languages : fromHeader,
     keyboard: {
       layout: clampStr(keyboard.layout, 80),
       sample: clampStr(keyboard.sample, 20),
@@ -391,31 +421,103 @@ function sanitizeVisit(body, req, ip, geo) {
       pixelRatio: Number.isFinite(screen.pixelRatio) ? Number(screen.pixelRatio.toFixed(2)) : null,
       viewportW: Number.isFinite(screen.viewportW) ? Math.round(screen.viewportW) : null,
       viewportH: Number.isFinite(screen.viewportH) ? Math.round(screen.viewportH) : null,
+      outerW: Number.isFinite(screen.outerW) ? Math.round(screen.outerW) : null,
+      outerH: Number.isFinite(screen.outerH) ? Math.round(screen.outerH) : null,
+      orientation: clampStr(screen.orientation, 40),
     },
-    timezone: clampStr(client.timezone, 60),
-    platform: clampStr(client.platform, 80),
+    timezone: clampStr(client.timezone, 60) || (geo && geo.timezone) || null,
+    platform: clampStr(client.platform, 80) || platformFromUa(client.userAgent || req.headers["user-agent"]),
     userAgent: clampStr(client.userAgent || req.headers["user-agent"], 350),
     hardwareConcurrency: Number.isFinite(client.hardwareConcurrency) ? client.hardwareConcurrency : null,
     deviceMemory: Number.isFinite(client.deviceMemory) ? client.deviceMemory : null,
+    maxTouchPoints: Number.isFinite(client.maxTouchPoints) ? client.maxTouchPoints : null,
     referrer: clampStr(client.referrer, 300),
     acceptLanguage: clampStr(req.headers["accept-language"], 160),
+    cookiesEnabled: typeof client.cookiesEnabled === "boolean" ? client.cookiesEnabled : null,
+    globalPrivacyControl: typeof client.globalPrivacyControl === "boolean" ? client.globalPrivacyControl : null,
+    pdfViewerEnabled: typeof client.pdfViewerEnabled === "boolean" ? client.pdfViewerEnabled : null,
+    webdriver: typeof client.webdriver === "boolean" ? client.webdriver : null,
+    clientHints: sanitizeHints(client.clientHints),
+    theme: {
+      colorScheme: clampStr(theme.colorScheme, 20),
+      reducedMotion: typeof theme.reducedMotion === "boolean" ? theme.reducedMotion : null,
+      pointer: clampStr(theme.pointer, 20),
+      hover: typeof theme.hover === "boolean" ? theme.hover : null,
+      colorGamut: clampStr(theme.colorGamut, 12),
+    },
+    network: {
+      type: clampStr(network.type, 20),
+      effectiveType: clampStr(network.effectiveType, 12),
+      downlink: Number.isFinite(network.downlink) ? Number(network.downlink.toFixed(2)) : null,
+      rtt: Number.isFinite(network.rtt) ? Math.round(network.rtt) : null,
+      saveData: typeof network.saveData === "boolean" ? network.saveData : null,
+    },
+    gpu: {
+      vendor: clampStr(gpu.vendor, 120),
+      renderer: clampStr(gpu.renderer, 180),
+    },
+    voices: {
+      count: Number.isFinite(voices.count) ? voices.count : null,
+      langs: Array.isArray(voices.langs)
+        ? voices.langs.map((x) => clampStr(x, 20)).filter(Boolean).slice(0, 20)
+        : [],
+      names: Array.isArray(voices.names)
+        ? voices.names.map((x) => clampStr(x, 80)).filter(Boolean).slice(0, 16)
+        : [],
+    },
+    intl: {
+      locale: clampStr(intl.locale, 30),
+      calendar: clampStr(intl.calendar, 30),
+      numberingSystem: clampStr(intl.numberingSystem, 20),
+      timeZone: clampStr(intl.timeZone, 60),
+    },
+    storage: {
+      quotaMB: Number.isFinite(storage.quotaMB) ? storage.quotaMB : null,
+      usageMB: Number.isFinite(storage.usageMB) ? storage.usageMB : null,
+    },
     consent: client.consent === true,
   };
 }
 
 function mergeVisit(base, extra) {
   if (!extra) return base;
-  if (extra.language) base.language = extra.language;
-  if (extra.languages && extra.languages.length) base.languages = extra.languages;
-  if (extra.keyboard && extra.keyboard.layout) base.keyboard = extra.keyboard;
-  if (extra.screen && extra.screen.width) base.screen = extra.screen;
-  if (extra.timezone) base.timezone = extra.timezone;
-  if (extra.platform) base.platform = extra.platform;
-  if (extra.userAgent) base.userAgent = extra.userAgent;
-  if (extra.hardwareConcurrency != null) base.hardwareConcurrency = extra.hardwareConcurrency;
-  if (extra.deviceMemory != null) base.deviceMemory = extra.deviceMemory;
-  if (extra.referrer) base.referrer = extra.referrer;
-  if (extra.geolocation) base.geolocation = extra.geolocation;
+  const keys = [
+    "language",
+    "languages",
+    "keyboard",
+    "screen",
+    "timezone",
+    "platform",
+    "userAgent",
+    "hardwareConcurrency",
+    "deviceMemory",
+    "maxTouchPoints",
+    "referrer",
+    "cookiesEnabled",
+    "globalPrivacyControl",
+    "pdfViewerEnabled",
+    "webdriver",
+    "clientHints",
+    "theme",
+    "network",
+    "gpu",
+    "voices",
+    "intl",
+    "storage",
+    "geolocation",
+  ];
+  for (const k of keys) {
+    const v = extra[k];
+    if (v == null) continue;
+    if (Array.isArray(v) && !v.length) continue;
+    if (typeof v === "object" && !Array.isArray(v)) {
+      const useful = Object.values(v).some((x) => x != null && x !== false && !(Array.isArray(x) && !x.length));
+      if (!useful) continue;
+      base[k] = Object.assign({}, base[k] || {}, v);
+    } else {
+      base[k] = v;
+    }
+  }
   return base;
 }
 
