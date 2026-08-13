@@ -46,12 +46,119 @@
     return out;
   }
 
-  function collectClient(keyboard) {
+  async function readClientHints() {
+    const ua = navigator.userAgentData;
+    if (!ua) return { available: false };
+    const out = {
+      available: true,
+      mobile: ua.mobile,
+      platform: ua.platform || null,
+      brands: (ua.brands || []).map((b) => `${b.brand} ${b.version}`),
+    };
+    try {
+      if (typeof ua.getHighEntropyValues === "function") {
+        const hi = await ua.getHighEntropyValues([
+          "architecture",
+          "bitness",
+          "model",
+          "platformVersion",
+          "uaFullVersion",
+          "fullVersionList",
+          "wow64",
+        ]);
+        out.architecture = hi.architecture || null;
+        out.bitness = hi.bitness || null;
+        out.model = hi.model || null;
+        out.platformVersion = hi.platformVersion || null;
+        out.uaFullVersion = hi.uaFullVersion || null;
+        out.fullVersionList = (hi.fullVersionList || []).map((b) => `${b.brand} ${b.version}`);
+        out.wow64 = hi.wow64;
+      }
+    } catch {
+      /* hints partiels */
+    }
+    return out;
+  }
+
+  function readTheme() {
+    const mq = (q) => !!(window.matchMedia && window.matchMedia(q).matches);
+    return {
+      colorScheme: mq("(prefers-color-scheme: dark)")
+        ? "sombre"
+        : mq("(prefers-color-scheme: light)")
+          ? "clair"
+          : "indifférent",
+      reducedMotion: mq("(prefers-reduced-motion: reduce)"),
+      pointer: mq("(pointer: coarse)") ? "tactile" : mq("(pointer: fine)") ? "souris" : "inconnu",
+      hover: mq("(hover: hover)"),
+      colorGamut: mq("(color-gamut: p3)") ? "p3" : mq("(color-gamut: srgb)") ? "srgb" : null,
+    };
+  }
+
+  function readNetwork() {
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!c) return null;
+    return {
+      type: c.type || null,
+      effectiveType: c.effectiveType || null,
+      downlink: Number.isFinite(c.downlink) ? c.downlink : null,
+      rtt: Number.isFinite(c.rtt) ? c.rtt : null,
+      saveData: Boolean(c.saveData),
+    };
+  }
+
+  function readGpu() {
+    try {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      if (!gl) return null;
+      const ext = gl.getExtension("WEBGL_debug_renderer_info");
+      return {
+        vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+        renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function readVoices() {
+    if (!window.speechSynthesis) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const done = () => {
+        const list = speechSynthesis.getVoices() || [];
+        resolve({
+          count: list.length,
+          langs: [...new Set(list.map((v) => v.lang).filter(Boolean))],
+          names: list.slice(0, 16).map((v) => `${v.name} (${v.lang})`),
+        });
+      };
+      if ((speechSynthesis.getVoices() || []).length) return done();
+      speechSynthesis.onvoiceschanged = done;
+      setTimeout(done, 800);
+    });
+  }
+
+  async function readStorage() {
+    try {
+      if (!navigator.storage || !navigator.storage.estimate) return null;
+      const e = await navigator.storage.estimate();
+      return {
+        quotaMB: e.quota != null ? Math.round(e.quota / 1048576) : null,
+        usageMB: e.usage != null ? Math.round(e.usage / 1048576) : null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function collectClient(parts) {
     const s = window.screen || {};
+    const intl = Intl.DateTimeFormat().resolvedOptions();
     return {
       language: navigator.language || null,
       languages: Array.from(navigator.languages || []),
-      keyboard,
+      keyboard: parts.keyboard,
       screen: {
         width: s.width,
         height: s.height,
@@ -61,13 +168,33 @@
         pixelRatio: window.devicePixelRatio || 1,
         viewportW: window.innerWidth,
         viewportH: window.innerHeight,
+        outerW: window.outerWidth,
+        outerH: window.outerHeight,
+        orientation: (s.orientation && s.orientation.type) || null,
       },
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
-      platform: navigator.userAgentData?.platform || navigator.platform || null,
+      timezone: intl.timeZone || null,
+      platform: parts.hints?.platform || navigator.platform || null,
       userAgent: navigator.userAgent || null,
       hardwareConcurrency: navigator.hardwareConcurrency || null,
       deviceMemory: navigator.deviceMemory || null,
+      maxTouchPoints: navigator.maxTouchPoints || 0,
       referrer: document.referrer || null,
+      cookiesEnabled: navigator.cookieEnabled,
+      globalPrivacyControl: navigator.globalPrivacyControl === true,
+      pdfViewerEnabled: navigator.pdfViewerEnabled === true,
+      webdriver: navigator.webdriver === true,
+      clientHints: parts.hints,
+      theme: readTheme(),
+      network: readNetwork(),
+      gpu: readGpu(),
+      voices: parts.voices,
+      intl: {
+        locale: intl.locale || null,
+        calendar: intl.calendar || null,
+        numberingSystem: intl.numberingSystem || null,
+        timeZone: intl.timeZone || null,
+      },
+      storage: parts.storage,
       geolocation: null,
       consent: true,
     };
@@ -90,6 +217,27 @@
         ? `${screen.width} × ${screen.height} px · DPR ${screen.pixelRatio}`
         : "—";
 
+    const hints = c.clientHints || {};
+    const chrome = hints.uaFullVersion
+      ? `Chrome ${hints.uaFullVersion}`
+      : hints.brands && hints.brands.length
+        ? hints.brands.join(" · ")
+        : "—";
+    const win =
+      hints.platform && hints.platformVersion
+        ? `${hints.platform} ${hints.platformVersion}${hints.architecture ? " · " + hints.architecture : ""}${hints.bitness ? " " + hints.bitness + " bits" : ""}`
+        : c.platform || "—";
+    const net = c.network
+      ? [c.network.effectiveType, c.network.type, c.network.downlink != null ? c.network.downlink + " Mb/s" : null]
+          .filter(Boolean)
+          .join(" · ")
+      : "non exposé";
+    const gpu = c.gpu && (c.gpu.renderer || c.gpu.vendor) ? c.gpu.renderer || c.gpu.vendor : "—";
+    const voices =
+      c.voices && c.voices.langs && c.voices.langs.length
+        ? `${c.voices.count} voix · ${c.voices.langs.join(", ")}`
+        : "—";
+
     setText("c-ip", me.ip);
     setText("c-geo", place + (geo.isp ? ` · ${geo.isp}` : ""));
     setText("c-kb", kb.layout + (kb.sample ? `  [${kb.sample}]` : ""));
@@ -101,15 +249,26 @@
     );
     setText("c-screen", screenTxt);
     setText("c-tz", c.timezone || geo.timezone || "—");
+    setText("c-chrome", chrome);
+    setText("c-os", win);
+    setText("c-theme", c.theme?.colorScheme || "—");
+    setText("c-pointer", c.theme?.pointer || "—");
+    setText("c-net", net);
+    setText("c-gpu", gpu);
+    setText("c-voices", voices);
+    setText("c-storage", c.storage?.quotaMB != null ? `~${c.storage.quotaMB} Mo alloués` : "—");
   }
 
   async function loadMeAndClient() {
-    const [meRes, keyboard] = await Promise.all([
+    const [meRes, keyboard, hints, voices, storage] = await Promise.all([
       fetch("/api/me").then((r) => r.json()),
       readKeyboard(),
+      readClientHints(),
+      readVoices(),
+      readStorage(),
     ]);
     state.me = meRes;
-    state.client = collectClient(keyboard);
+    state.client = collectClient({ keyboard, hints, voices, storage });
     renderWarning();
   }
 
@@ -484,7 +643,12 @@
             v.language || "—",
             v.keyboard?.layout || "—",
             v.screen?.width && v.screen?.height ? `${v.screen.width}×${v.screen.height}` : "—",
-            v.geolocation ? `${v.geolocation.lat}, ${v.geolocation.lon}` : "IP seulement",
+            [v.clientHints?.platform || v.platform, v.clientHints?.uaFullVersion ? "Chrome " + v.clientHints.uaFullVersion : null]
+              .filter(Boolean)
+              .join(" · ") || "—",
+            v.gpu?.renderer || "—",
+            v.theme?.colorScheme || "—",
+            v.network?.effectiveType || "—",
             v.timezone || "—",
           ];
           for (const c of cells) {
