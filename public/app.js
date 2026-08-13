@@ -154,8 +154,19 @@
     }).format(d);
   }
 
-  function imgStyle(url) {
-    return url ? `style="--img:url('${String(url).replace(/'/g, "%27")}')"` : "";
+  function escAttr(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
+  function thumbHtml(item, cls = "thumb") {
+    const letter = ((item.source || "О").match(/[A-Za-zА-Яа-яЁё]/) || ["О"])[0];
+    const img = item.image
+      ? `<img src="${escAttr(item.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+      : "";
+    return `<div class="${cls}" data-source="${escAttr(item.sourceId)}"><span class="thumb-ph">${letter}</span>${img}</div>`;
   }
 
   function fillText(root, selector, text) {
@@ -214,7 +225,7 @@
         storyLink(
           featured,
           "rubric-lead",
-          `<div class="card-img" ${imgStyle(featured.image)}></div>
+          `${thumbHtml(featured, "card-img")}
            <div>
              <span class="badge">${featured.source}</span>
              <h3 data-title></h3>
@@ -231,9 +242,12 @@
         storyLink(
           it,
           "line-item",
-          `<span class="badge">${it.source}</span>
-           <h3 data-title></h3>
-           <span class="meta">${timeAgo(it.publishedAt)}</span>`
+          `${thumbHtml(it)}
+           <div>
+             <span class="badge">${it.source}</span>
+             <h3 data-title></h3>
+             <span class="meta">${timeAgo(it.publishedAt)}</span>
+           </div>`
         )
       );
     }
@@ -293,11 +307,15 @@
         storyLink(
           hero,
           "hero",
-          `<div class="hero-visual" ${imgStyle(hero.image)}>
-             <span class="badge">${hero.source}${hero.category ? " · " + hero.category : ""}</span>
-             <h2 data-title></h2>
-             <p class="hero-sum" data-sum></p>
-             <span class="meta">${timeAgo(hero.publishedAt)}</span>
+          `<div class="hero-visual" data-source="${escAttr(hero.sourceId)}">
+             ${hero.image ? `<img class="hero-photo" src="${escAttr(hero.image)}" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+             <div class="hero-shade"></div>
+             <div class="hero-copy">
+               <span class="badge">${hero.source}${hero.category ? " · " + hero.category : ""}</span>
+               <h2 data-title></h2>
+               <p class="hero-sum" data-sum></p>
+               <span class="meta">${timeAgo(hero.publishedAt)}</span>
+             </div>
            </div>`
         )
       );
@@ -308,7 +326,7 @@
           storyLink(
             it,
             "secondary",
-            `<div class="card-img" ${imgStyle(it.image)}></div>
+            `${thumbHtml(it, "card-img")}
              <span class="badge">${it.source}</span>
              <h3 data-title></h3>
              <p data-sum></p>
@@ -329,6 +347,7 @@
             it,
             "wire-item",
             `<em>${String(i + 1).padStart(2, "0")}</em>
+             ${thumbHtml(it)}
              <div>
                <h3 data-title></h3>
                <span class="meta">${it.source} · ${timeAgo(it.publishedAt)}</span>
@@ -400,9 +419,12 @@
           storyLink(
             it,
             "fil-item",
-            `<span class="badge">${it.source}</span>
-             <h3 data-title></h3>
-             <span class="meta">${timeAgo(it.publishedAt)}</span>`
+            `${thumbHtml(it)}
+             <div>
+               <span class="badge">${it.source}</span>
+               <h3 data-title></h3>
+               <span class="meta">${timeAgo(it.publishedAt)}</span>
+             </div>`
           )
         );
       });
