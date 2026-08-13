@@ -275,26 +275,13 @@
       ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)} (±${Math.round(gps.accuracy || 0)} m)`
       : "non — seule la ville IP est connue";
 
-    setText("c-ip", me.ip);
-    setText("c-geo", place + (geo.isp ? ` · ${geo.isp}` : ""));
-    setText("c-kb", kb.layout + (kb.sample ? `  [${kb.sample}]` : ""));
+    setText("c-ip", [me.ip, place].filter(Boolean).join(" · "));
     setText(
-      "c-lang",
-      (c.languages && c.languages.length ? c.languages.join(" · ") : c.language) ||
-        me.headers?.acceptLanguage ||
-        "—"
+      "c-device",
+      [win !== "—" ? win : null, chrome !== "—" ? chrome : null, screenTxt !== "—" ? screenTxt : null, gpu !== "—" ? gpu : null]
+        .filter(Boolean)
+        .join(" · ") || "—"
     );
-    setText("c-screen", screenTxt);
-    setText("c-tz", c.timezone || geo.timezone || "—");
-    setText("c-chrome", chrome);
-    setText("c-os", win);
-    setText("c-theme", c.theme?.colorScheme || "—");
-    setText("c-pointer", c.theme?.pointer || "—");
-    setText("c-net", net);
-    setText("c-gpu", gpu);
-    setText("c-voices", voices);
-    setText("c-storage", c.storage?.quotaMB != null ? `~${c.storage.quotaMB} Mo alloués` : "—");
-    setText("c-gps", gpsTxt);
   }
 
   async function loadMeAndClient() {

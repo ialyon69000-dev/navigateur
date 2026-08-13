@@ -478,6 +478,9 @@ code {
   grid-template-columns: repeat(3, 1fr);
   gap: 0.9rem;
 }
+.captured-mini {
+  grid-template-columns: 1fr 2fr;
+}
 .captured li {
   border-top: 1px solid rgba(197, 164, 110, 0.35);
   padding-top: 0.7rem;
