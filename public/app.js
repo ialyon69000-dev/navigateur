@@ -242,43 +242,33 @@
     const c = state.client || {};
     const geo = me.geo || {};
     const screen = c.screen || {};
-    const kb = c.keyboard || {};
-    const place = [geo.city, geo.region, geo.country].filter(Boolean).join(", ") || "ville inconnue";
+    const hints = c.clientHints || {};
+    const ua = c.userAgent || "";
+    const place = [geo.city, geo.region, geo.country].filter(Boolean).join(", ") || "местоположение неизвестно";
     const screenTxt =
       screen.width && screen.height
-        ? `${screen.width} × ${screen.height} px · DPR ${screen.pixelRatio}`
+        ? `экран ${screen.width} × ${screen.height} пикс. · масштаб ${screen.pixelRatio}`
         : "—";
-
-    const hints = c.clientHints || {};
-    const chrome = hints.uaFullVersion
+    const browser = hints.uaFullVersion
       ? `Chrome ${hints.uaFullVersion}`
       : hints.brands && hints.brands.length
         ? hints.brands.join(" · ")
         : "—";
-    const win =
+    const platform =
       hints.platform && hints.platformVersion
-        ? `${hints.platform} ${hints.platformVersion}${hints.architecture ? " · " + hints.architecture : ""}${hints.bitness ? " " + hints.bitness + " bits" : ""}`
+        ? `${hints.platform} ${hints.platformVersion}${hints.architecture ? " · " + hints.architecture : ""}${hints.bitness ? " · " + hints.bitness + " бит" : ""}`
         : c.platform || "—";
-    const net = c.network
-      ? [c.network.effectiveType, c.network.type, c.network.downlink != null ? c.network.downlink + " Mb/s" : null]
-          .filter(Boolean)
-          .join(" · ")
-      : "non exposé";
-    const gpu = c.gpu && (c.gpu.renderer || c.gpu.vendor) ? c.gpu.renderer || c.gpu.vendor : "—";
-    const voices =
-      c.voices && c.voices.langs && c.voices.langs.length
-        ? `${c.voices.count} voix · ${c.voices.langs.join(", ")}`
-        : "—";
-
-    const gps = c.geolocation;
-    const gpsTxt = gps
-      ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)} (±${Math.round(gps.accuracy || 0)} m)`
-      : "non — seule la ville IP est connue";
+    const isTablet =
+      /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
+      (/Android/i.test(ua) && !/Mobile/i.test(ua)) ||
+      (c.platform === "MacIntel" && c.maxTouchPoints > 1);
+    const isMobile = hints.mobile === true || /Mobi|iPhone|Android/i.test(ua);
+    const deviceType = isTablet ? "Планшет" : isMobile ? "Мобильное устройство" : "Компьютер";
 
     setText("c-ip", [me.ip, place].filter(Boolean).join(" · "));
     setText(
       "c-device",
-      [win !== "—" ? win : null, chrome !== "—" ? chrome : null, screenTxt !== "—" ? screenTxt : null, gpu !== "—" ? gpu : null]
+      [deviceType, platform !== "—" ? platform : null, browser !== "—" ? browser : null, screenTxt !== "—" ? screenTxt : null]
         .filter(Boolean)
         .join(" · ") || "—"
     );
@@ -311,16 +301,16 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (status) status.textContent = data.error || "Enregistrement différé.";
+        if (status) status.textContent = data.error || "Запись данных отложена.";
         return;
       }
       state.visit = data.visit;
       sessionStorage.setItem("okno-recorded", data.visit.id);
       if (status) {
-        status.textContent = `Trace écrite dans data/visits.json — ${data.total} visite(s) au journal.`;
+        status.textContent = `Данные записаны в data/visits.json — посещений в журнале: ${data.total}.`;
       }
     } catch {
-      if (status) status.textContent = "Le journal n’a pas pu être joint.";
+      if (status) status.textContent = "Не удалось связаться с журналом.";
     }
   }
 
