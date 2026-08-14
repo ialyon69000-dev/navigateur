@@ -574,7 +574,7 @@ app.post("/api/visit", async (req, res) => {
   const now = Date.now();
   const prev = lastVisitByIp.get(ip) || 0;
   if (now - prev < VISIT_COOLDOWN_MS) {
-    return res.status(429).json({ error: "Patientez quelques secondes avant un nouvel enregistrement." });
+    return res.status(429).json({ error: "Подождите несколько секунд перед новой записью." });
   }
   lastVisitByIp.set(ip, now);
 

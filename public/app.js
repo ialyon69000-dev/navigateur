@@ -311,16 +311,16 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (status) status.textContent = data.error || "Enregistrement différé.";
+        if (status) status.textContent = data.error || "Запись будет внесена позже.";
         return;
       }
       state.visit = data.visit;
       sessionStorage.setItem("okno-recorded", data.visit.id);
       if (status) {
-        status.textContent = `Trace écrite dans data/visits.json — ${data.total} visite(s) au journal.`;
+        status.textContent = `Запись внесена в data/visits.json — посещений в журнале: ${data.total}.`;
       }
     } catch {
-      if (status) status.textContent = "Le journal n’a pas pu être joint.";
+      if (status) status.textContent = "Не удалось связаться с журналом.";
     }
   }
 
