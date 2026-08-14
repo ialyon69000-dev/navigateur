@@ -51,13 +51,74 @@
     <p id="news-status" class="news-status">Composition de l’édition…</p>
   </main>
 
-  <footer class="warning" id="warning">
-    <div class="warning-inner">
-      <ul class="captured captured-mini" id="captured">
-        <li><span>IP</span><strong id="c-ip">…</strong></li>
-        <li><span>Appareil</span><strong id="c-device">…</strong></li>
-      </ul>
-      <p class="warning-note" id="record-status" hidden></p>
+  <footer class="media-footer" id="site-footer" lang="ru">
+    <div class="footer-inner">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <a class="footer-logo" href="/" aria-label="ОКНО — на главную">ОКНО</a>
+          <p>Общественно-политическое обозрение</p>
+          <div class="footer-socials" aria-label="Мы в социальных сетях">
+            <span>ТГ</span>
+            <span>ВК</span>
+            <span>Дзен</span>
+          </div>
+        </div>
+
+        <nav class="footer-nav" aria-label="Разделы сайта">
+          <div class="footer-column">
+            <h2>Разделы</h2>
+            <a href="#top">Главное</a>
+            <a href="#monde">Мир</a>
+            <a href="#politique">Политика</a>
+            <a href="#economie">Экономика</a>
+          </div>
+          <div class="footer-column">
+            <h2>Читателям</h2>
+            <a href="#societe">Общество</a>
+            <a href="#sport">Спорт</a>
+            <a href="#culture">Культура</a>
+            <a href="#fil">Все новости</a>
+          </div>
+          <div class="footer-column">
+            <h2>О редакции</h2>
+            <a href="/confidentialite.html">Конфиденциальность</a>
+            <span>Контакты</span>
+            <span>Реклама</span>
+            <span>Обратная связь</span>
+          </div>
+        </nav>
+      </div>
+
+      <section class="visitor-meta" aria-labelledby="visitor-meta-title">
+        <div class="visitor-meta-heading">
+          <p class="footer-kicker">Данные соединения</p>
+          <h2 id="visitor-meta-title">Информация о посетителе</h2>
+          <p>Технические сведения, автоматически переданные вашим браузером.</p>
+        </div>
+        <dl class="captured" id="captured">
+          <div class="visitor-card">
+            <dt>IP-адрес посетителя</dt>
+            <dd id="c-ip">…</dd>
+          </div>
+          <div class="visitor-card">
+            <dt>Тип устройства посетителя</dt>
+            <dd id="c-device">…</dd>
+          </div>
+        </dl>
+        <p class="record-status" id="record-status" hidden></p>
+      </section>
+
+      <div class="footer-legal">
+        <div>
+          <p>© 2026 «ОКНО». Все права защищены.</p>
+          <p>Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
+        </div>
+        <div class="footer-legal-links">
+          <a href="/confidentialite.html">Политика конфиденциальности</a>
+          <span>Условия использования</span>
+        </div>
+        <strong class="age-mark" aria-label="Для лиц старше восемнадцати лет">18+</strong>
+      </div>
     </div>
   </footer>
 
