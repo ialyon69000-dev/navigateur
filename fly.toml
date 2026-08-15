@@ -1,0 +1,29 @@
+app = 'okno-empreinte'
+primary_region = 'cdg' # Paris, proche de Clermont-Ferrand
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/data'
+  NODE_ENV = 'production'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'suspend' # économie, se réveille vite
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+# Volume persistant 1GB gratuit (dans free allowance ancienne, ou $0.15/mois aujourd'hui)
+# Crée-le avant deploy avec :
+# fly volumes create data_vol --region cdg --size 1
+[mounts]
+  source = 'data_vol'
+  destination = '/data'
