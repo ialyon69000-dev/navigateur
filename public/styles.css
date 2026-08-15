@@ -47,7 +47,7 @@ body {
     );
 }
 
-body > *:not(.paper-bg) { position: relative; z-index: 1; }
+body > *:not(.paper-bg):not(.lang-switch) { position: relative; z-index: 1; }
 
 a { color: inherit; }
 code {
@@ -57,11 +57,14 @@ code {
 }
 
 /* ——— Language switcher ——— */
-.lang-switch {
-  position: fixed;
-  top: 0.7rem;
-  right: 0.9rem;
-  z-index: 10000;
+.lang-switch,
+body > .lang-switch {
+  position: fixed !important;
+  top: 0.7rem !important;
+  right: 0.9rem !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 10000 !important;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
