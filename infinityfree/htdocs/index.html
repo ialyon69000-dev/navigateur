@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -12,34 +12,34 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
+<body data-i18n-title="title.home">
   <div class="paper-bg" aria-hidden="true"></div>
 
   <header class="site-header">
     <div class="header-rail">
       <span id="today"></span>
       <span class="rail-dot"></span>
-      <span id="source-count">Sept rédactions</span>
+      <span id="source-count" data-i18n="rail.seven">Семь редакций</span>
       <span class="rail-dot"></span>
-      <span>Édition du soir</span>
+      <span data-i18n="rail.edition">Вечерний выпуск</span>
     </div>
 
     <a class="mast" href="/">
       <span class="mast-ornament" aria-hidden="true">✦</span>
       <h1 class="mast-title">ОКНО</h1>
-      <p class="mast-line">Revue · Moscou, Saint-Pétersbourg, le monde</p>
+      <p class="mast-line" data-i18n="mast.tagline">Обозрение · Москва, Петербург, мир</p>
       <span class="mast-ornament" aria-hidden="true">✦</span>
     </a>
 
     <nav class="desk" aria-label="Rubriques">
-      <a href="#top">À la une</a>
-      <a href="#monde">Monde</a>
-      <a href="#politique">Politique</a>
-      <a href="#economie">Économie</a>
-      <a href="#societe">Société</a>
-      <a href="#sport">Sport</a>
-      <a href="#culture">Culture</a>
-      <a href="#fil">En continu</a>
+      <a href="#top" data-i18n="nav.top">Главное</a>
+      <a href="#monde" data-i18n="nav.monde">Мир</a>
+      <a href="#politique" data-i18n="nav.politique">Политика</a>
+      <a href="#economie" data-i18n="nav.economie">Экономика</a>
+      <a href="#societe" data-i18n="nav.societe">Общество</a>
+      <a href="#sport" data-i18n="nav.sport">Спорт</a>
+      <a href="#culture" data-i18n="nav.culture">Культура</a>
+      <a href="#fil" data-i18n="nav.fil">Лента</a>
     </nav>
   </header>
 
@@ -48,16 +48,16 @@
   </div>
 
   <main class="edition" id="news-root" aria-live="polite">
-    <p id="news-status" class="news-status">Composition de l’édition…</p>
+    <p id="news-status" class="news-status" data-i18n="news.composing">Собираем выпуск…</p>
   </main>
 
   <footer class="media-footer" id="site-footer" lang="ru">
     <div class="footer-inner">
       <div class="footer-main">
         <div class="footer-brand">
-          <a class="footer-logo" href="/" aria-label="ОКНО — на главную">ОКНО</a>
-          <p>Общественно-политическое обозрение</p>
-          <div class="footer-socials" aria-label="Мы в социальных сетях">
+          <a class="footer-logo" href="/" data-i18n="footer.home" data-i18n-attr="aria-label" data-i18n-attr-key="footer.home">ОКНО</a>
+          <p data-i18n="footer.tagline">Общественно-политическое обозрение</p>
+          <div class="footer-socials" data-i18n="footer.socials" data-i18n-attr="aria-label" data-i18n-attr-key="footer.socials" aria-label="Мы в социальных сетях">
             <span>ТГ</span>
             <span>ВК</span>
             <span>Дзен</span>
@@ -66,42 +66,42 @@
 
         <nav class="footer-nav" aria-label="Разделы сайта">
           <div class="footer-column">
-            <h2>Разделы</h2>
-            <a href="#top">Главное</a>
-            <a href="#monde">Мир</a>
-            <a href="#politique">Политика</a>
-            <a href="#economie">Экономика</a>
+            <h2 data-i18n="footer.sections">Разделы</h2>
+            <a href="#top" data-i18n="nav.top">Главное</a>
+            <a href="#monde" data-i18n="nav.monde">Мир</a>
+            <a href="#politique" data-i18n="nav.politique">Политика</a>
+            <a href="#economie" data-i18n="nav.economie">Экономика</a>
           </div>
           <div class="footer-column">
-            <h2>Читателям</h2>
-            <a href="#societe">Общество</a>
-            <a href="#sport">Спорт</a>
-            <a href="#culture">Культура</a>
-            <a href="#fil">Все новости</a>
+            <h2 data-i18n="footer.readers">Читателям</h2>
+            <a href="#societe" data-i18n="nav.societe">Общество</a>
+            <a href="#sport" data-i18n="nav.sport">Спорт</a>
+            <a href="#culture" data-i18n="nav.culture">Культура</a>
+            <a href="#fil" data-i18n="footer.all-news">Все новости</a>
           </div>
           <div class="footer-column">
-            <h2>О редакции</h2>
-            <a href="/confidentialite.html">Конфиденциальность</a>
-            <a href="/contacts.html">Контакты</a>
-            <span>Реклама</span>
-            <a href="/contacts.html">Обратная связь</a>
+            <h2 data-i18n="footer.about">О редакции</h2>
+            <a href="/confidentialite.html" data-i18n="footer.privacy">Конфиденциальность</a>
+            <a href="/contacts.html" data-i18n="footer.contacts">Контакты</a>
+            <span data-i18n="footer.ad">Реклама</span>
+            <a href="/contacts.html" data-i18n="footer.feedback">Обратная связь</a>
           </div>
         </nav>
       </div>
 
       <section class="visitor-meta" aria-labelledby="visitor-meta-title">
         <div class="visitor-meta-heading">
-          <p class="footer-kicker">Данные соединения</p>
-          <h2 id="visitor-meta-title">Информация о посетителе</h2>
-          <p>Технические сведения, автоматически переданные вашим браузером.</p>
+          <p class="footer-kicker" data-i18n="visitor.kicker">Данные соединения</p>
+          <h2 id="visitor-meta-title" data-i18n="visitor.title">Информация о посетителе</h2>
+          <p data-i18n="visitor.desc">Технические сведения, автоматически переданные вашим браузером.</p>
         </div>
         <dl class="captured" id="captured">
           <div class="visitor-card">
-            <dt>IP-адрес посетителя</dt>
+            <dt data-i18n="visitor.ip">IP-адрес посетителя</dt>
             <dd id="c-ip">…</dd>
           </div>
           <div class="visitor-card">
-            <dt>Тип устройства посетителя</dt>
+            <dt data-i18n="visitor.device">Тип устройства посетителя</dt>
             <dd id="c-device">…</dd>
           </div>
         </dl>
@@ -122,5 +122,6 @@
     </div>
   </footer>
 
+  <script src="/i18n.js"></script>
   <script src="/app.js"></script>
 </html>

@@ -3,66 +3,69 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Правовая информация — ОКНО</title>
+  <title data-i18n="legal.page-title">Правовая информация — ОКНО</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
+<body data-i18n-title="title.legal">
   <header class="topbar">
-    <p class="topbar-msg"><a href="/">Вернуться к журналу</a></p>
+    <p class="topbar-msg"><a href="/" data-i18n="topbar.back">Вернуться к журналу</a></p>
   </header>
 
   <main class="lab">
-    <p class="kicker">О редакции</p>
-    <h1>Правовая информация</h1>
-    <p>
+    <p class="kicker" data-i18n="legal.kicker">О редакции</p>
+    <h1 data-i18n="legal.page-title">Правовая информация</h1>
+    <p data-i18n="legal.intro">
       На этой странице собраны сведения, которые редакция «ОКНО» считает нужным сообщить читателям.
     </p>
 
-    <h2>Об издании</h2>
-    <p>
+    <h2 data-i18n="legal.about-title">Об издании</h2>
+    <p data-i18n="legal.about">
       «ОКНО» — учебный проект, созданный в образовательных целях: он показывает, как устроено
       интернет-издание и какие технические сведения браузер автоматически передаёт сайту
       при каждом посещении. «ОКНО» не является зарегистрированным средством массовой информации
       и не ведёт коммерческой деятельности.
     </p>
 
-    <h2>Права на материалы</h2>
-    <p>
+    <h2 data-i18n="legal.rights-title">Права на материалы</h2>
+    <p data-i18n="legal.rights">
       Заголовки, изображения и тексты новостей принадлежат их авторам и изданиям-первоисточникам:
       ТАСС, РИА Новости, Lenta.ru, «Коммерсантъ», «Известия», МК и «Газета.Ru».
       «ОКНО» приводит ссылки на материалы этих изданий и не хранит копии их публикаций.
       При использовании материалов «ОКНО» ссылка на издание обязательна.
     </p>
 
-    <h2>Ограничение ответственности</h2>
-    <p>
+    <h2 data-i18n="legal.disclaimer-title">Ограничение ответственности</h2>
+    <p data-i18n="legal.disclaimer-text">
       Редакция не несёт ответственности за достоверность, полноту и актуальность материалов
       внешних изданий, на которые ведут ссылки. Мнения авторов публикаций могут не совпадать
       с позицией редакции.
     </p>
 
-    <h2>Возрастное ограничение</h2>
-    <p>Сайт предназначен для посетителей старше 18 лет (18+).</p>
+    <h2 data-i18n="legal.age-title">Возрастное ограничение</h2>
+    <p data-i18n="legal.age-text">Сайт предназначен для посетителей старше 18 лет (18+).</p>
 
-    <h2>Персональные данные</h2>
-    <p>
+    <h2 data-i18n="legal.pd-title">Персональные данные</h2>
+    <p data-i18n="legal.pd-text" data-i18n-html="1">
       Технические сведения о посетителях записываются в учебный журнал
       <code>data/visits.json</code> в рамках образовательной демонстрации. Порядок обработки
       этих сведений описан в <a href="/confidentialite.html">политике конфиденциальности</a>.
     </p>
 
-    <h2>Связь с редакцией</h2>
-    <p>
+    <h2 data-i18n="legal.contact-title">Связь с редакцией</h2>
+    <p data-i18n="legal.contact-text" data-i18n-html="1">
       По всем юридическим вопросам пишите на адрес
       <a href="mailto:alexei47@okho.ru">alexei47@okho.ru</a> — единственный контакт «ОКНО».
     </p>
 
-    <p><a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/contacts.html">Контакты</a></p>
+    <p data-i18n="legal.links" data-i18n-html="1">
+      <a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/contacts.html">Контакты</a>
+    </p>
   </main>
+  <script src="/i18n.js"></script>
 </body>
 </html>
