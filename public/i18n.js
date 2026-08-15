@@ -377,63 +377,59 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     applyAll();
   }
 
-  function buildSwitcher() {
-    if (document.querySelector(".lang-switch")) return;
+function buildSwitcher() {
+  if (document.querySelector(".lang-switch")) return;
 
-    // Inline styles for top-left positioned flags
-    const style = document.createElement("style");
-    style.textContent = `
-      .lang-switch {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 9999;
-        display: flex;
-        gap: 4px;
-      }
-      .lang-btn {
-        width: 24px;
-        height: 16px;
-        border: none;
-        padding: 0;
-        cursor: pointer;
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        opacity: 0.5;
-        transition: opacity 0.2s;
-        border-radius: 2px;
-      }
-      .lang-btn:hover {
-        opacity: 0.8;
-      }
-      .lang-btn.is-active {
-        opacity: 1;
-        outline: 1px solid rgba(255,255,255,0.5);
-      }
-    `;
-    document.head.appendChild(style);
+  const style = document.createElement("style");
+  style.textContent = `
+    .lang-switch {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+      display: flex;
+      gap: 4px;
+    }
+    .lang-btn {
+      width: 24px;
+      height: 16px;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+      border-radius: 2px;
+      background: none;
+    }
+    .lang-btn:hover { opacity: 0.8; }
+    .lang-btn.is-active { opacity: 1; }
+    .lang-btn img { width: 100%; height: 100%; display: block; }
+  `;
+  document.head.appendChild(style);
 
-    const wrap = document.createElement("div");
-    wrap.className = "lang-switch";
-    wrap.setAttribute("role", "group");
-    wrap.setAttribute("aria-label", "Language / Язык");
+  const wrap = document.createElement("div");
+  wrap.className = "lang-switch";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Language / Язык");
 
-    const mk = (lang, flag, labelKey) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "lang-btn";
-      b.dataset.langBtn = lang;
-      b.style.backgroundImage = `url("${flag}")`;
-      b.setAttribute("aria-label", t(labelKey));
-      b.setAttribute("title", t(labelKey));
-      b.addEventListener("click", () => setLanguage(lang));
-      return b;
-    };
-    wrap.appendChild(mk("ru", RU_FLAG, "lang.switch-ru"));
-    wrap.appendChild(mk("en", UK_FLAG, "lang.switch-en"));
-    document.body.appendChild(wrap);
-  }
+  const mk = (lang, flag, labelKey) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "lang-btn";
+    b.dataset.langBtn = lang;
+    b.setAttribute("aria-label", t(labelKey));
+    b.setAttribute("title", t(labelKey));
+    b.addEventListener("click", () => setLanguage(lang));
+    const img = document.createElement("img");
+    img.src = flag;
+    img.alt = t(labelKey);
+    b.appendChild(img);
+    return b;
+  };
+  wrap.appendChild(mk("ru", RU_FLAG, "lang.switch-ru"));
+  wrap.appendChild(mk("en", UK_FLAG, "lang.switch-en"));
+  document.body.appendChild(wrap);
+}
 
   // Expose to app.js for dynamic content
   window.OKNO = window.OKNO || {};
