@@ -1,36 +1,46 @@
 (() => {
   const $ = (id) => document.getElementById(id);
+  const T = (key, ...args) => (window.OKNO && window.OKNO.t ? window.OKNO.t(key, ...args) : key);
+  const LANG = () => (window.OKNO && window.OKNO.lang ? window.OKNO.lang() : "ru");
 
   const state = {
     me: null,
     client: null,
     visit: null,
     news: [],
+    totalVisits: 0,
   };
 
-  const todayEl = $("today");
-  if (todayEl) {
-    todayEl.textContent = new Intl.DateTimeFormat("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "Europe/Paris",
-    }).format(new Date());
+  function dateLocale() {
+    return LANG() === "en" ? "en-GB" : "ru-RU";
   }
 
+  function renderToday() {
+    const todayEl = $("today");
+    if (todayEl) {
+      todayEl.textContent = new Intl.DateTimeFormat(dateLocale(), {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Europe/Moscow",
+      }).format(new Date());
+    }
+  }
+  renderToday();
+
   function detectLayoutFromSample(sample) {
-    if (!sample) return "Non détecté";
+    if (!sample) return T("layout.none");
     const s = sample.toLowerCase();
-    if (s.startsWith("azerty")) return "AZERTY (France / Belgique)";
-    if (s.startsWith("qwertz")) return "QWERTZ (Allemagne / Suisse)";
-    if (s.startsWith("qwerty")) return "QWERTY";
-    if (s.includes("'") || s.startsWith(",.")) return "Dvorak / variante";
-    return `Inconnu (${sample})`;
+    if (s.startsWith("azerty")) return T("layout.azerty");
+    if (s.startsWith("qwertz")) return T("layout.qwertz");
+    if (s.startsWith("qwerty")) return T("layout.qwerty");
+    if (s.includes("'") || s.startsWith(",.")) return T("layout.dvorak");
+    return T("layout.unknown", sample);
   }
 
   async function readKeyboard() {
-    const out = { api: false, sample: null, layout: "Non exposé (Firefox / Safari)" };
+    const out = { api: false, sample: null, layout: T("layout.not-exposed") };
     try {
       if (navigator.keyboard && typeof navigator.keyboard.getLayoutMap === "function") {
         const map = await navigator.keyboard.getLayoutMap();
@@ -41,7 +51,7 @@
         out.layout = detectLayoutFromSample(sample);
       }
     } catch {
-      out.layout = "API clavier bloquée";
+      out.layout = T("layout.blocked");
     }
     return out;
   }
@@ -84,12 +94,12 @@
     const mq = (q) => !!(window.matchMedia && window.matchMedia(q).matches);
     return {
       colorScheme: mq("(prefers-color-scheme: dark)")
-        ? "sombre"
+        ? "dark"
         : mq("(prefers-color-scheme: light)")
-          ? "clair"
-          : "indifférent",
+          ? "light"
+          : "any",
       reducedMotion: mq("(prefers-reduced-motion: reduce)"),
-      pointer: mq("(pointer: coarse)") ? "tactile" : mq("(pointer: fine)") ? "souris" : "inconnu",
+      pointer: mq("(pointer: coarse)") ? "touch" : mq("(pointer: fine)") ? "mouse" : "unknown",
       hover: mq("(hover: hover)"),
       colorGamut: mq("(color-gamut: p3)") ? "p3" : mq("(color-gamut: srgb)") ? "srgb" : null,
     };
@@ -244,33 +254,35 @@
     const screen = c.screen || {};
     const hints = c.clientHints || {};
     const ua = c.userAgent || "";
-    const place = [geo.city, geo.region, geo.country].filter(Boolean).join(", ") || "местоположение неизвестно";
+    const place = [geo.city, geo.region, geo.country].filter(Boolean).join(", ") || T("visitor.place-unknown");
+    const dash = T("device.dash");
     const screenTxt =
       screen.width && screen.height
-        ? `экран ${screen.width} × ${screen.height} пикс. · масштаб ${screen.pixelRatio}`
-        : "—";
+        ? T("device.screen", `${screen.width} × ${screen.height} ${T("device.px")} · ${T("device.scale")} ${screen.pixelRatio}`)
+        : dash;
     const browser = hints.uaFullVersion
       ? `Chrome ${hints.uaFullVersion}`
       : hints.brands && hints.brands.length
         ? hints.brands.join(" · ")
-        : "—";
+        : dash;
+    const bitnessLabel = LANG() === "en" ? "bit" : "бит";
     const platform =
       hints.platform && hints.platformVersion
-        ? `${hints.platform} ${hints.platformVersion}${hints.architecture ? " · " + hints.architecture : ""}${hints.bitness ? " · " + hints.bitness + " бит" : ""}`
-        : c.platform || "—";
+        ? `${hints.platform} ${hints.platformVersion}${hints.architecture ? " · " + hints.architecture : ""}${hints.bitness ? " · " + hints.bitness + " " + bitnessLabel : ""}`
+        : c.platform || dash;
     const isTablet =
       /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
       (/Android/i.test(ua) && !/Mobile/i.test(ua)) ||
       (c.platform === "MacIntel" && c.maxTouchPoints > 1);
     const isMobile = hints.mobile === true || /Mobi|iPhone|Android/i.test(ua);
-    const deviceType = isTablet ? "Планшет" : isMobile ? "Мобильное устройство" : "Компьютер";
+    const deviceType = isTablet ? T("device.tablet") : isMobile ? T("device.mobile") : T("device.desktop");
 
     setText("c-ip", [me.ip, place].filter(Boolean).join(" · "));
     setText(
       "c-device",
-      [deviceType, platform !== "—" ? platform : null, browser !== "—" ? browser : null, screenTxt !== "—" ? screenTxt : null]
+      [deviceType, platform !== dash ? platform : null, browser !== dash ? browser : null, screenTxt !== dash ? screenTxt : null]
         .filter(Boolean)
-        .join(" · ") || "—"
+        .join(" · ") || dash
     );
   }
 
@@ -301,16 +313,17 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (status) status.textContent = data.error || "Запись данных отложена.";
+        if (status) status.textContent = data.error || T("record.deferred");
         return;
       }
       state.visit = data.visit;
+      state.totalVisits = data.total;
       sessionStorage.setItem("okno-recorded", data.visit.id);
       if (status) {
-        status.textContent = `Данные записаны в data/visits.json — посещений в журнале: ${data.total}.`;
+        status.textContent = T("record.saved", data.total);
       }
     } catch {
-      if (status) status.textContent = "Не удалось связаться с журналом.";
+      if (status) status.textContent = T("record.failed");
     }
   }
 
@@ -319,11 +332,11 @@
     const d = Date.parse(iso);
     if (!d) return "";
     const min = Math.max(0, Math.round((Date.now() - d) / 60000));
-    if (min < 1) return "à l’instant";
-    if (min < 60) return `il y a ${min} min`;
+    if (min < 1) return T("time.now");
+    if (min < 60) return T("time.min", min);
     const h = Math.round(min / 60);
-    if (h < 24) return `il y a ${h} h`;
-    return new Intl.DateTimeFormat("fr-FR", {
+    if (h < 24) return T("time.h", h);
+    return new Intl.DateTimeFormat(dateLocale(), {
       day: "numeric",
       month: "short",
       hour: "2-digit",
@@ -433,193 +446,207 @@
     return sec;
   }
 
-  async function loadNews() {
+  function renderNews(items) {
     const status = $("news-status");
     const root = $("news-root");
+
+    if ($("source-count")) {
+      $("source-count").textContent = T("rail.articles", items.length);
+    }
+    const ticker = $("ticker");
+    if (ticker) {
+      const heads = items.slice(0, 18).map((it) => `${it.source} — ${it.title}`).join("    ·    ");
+      ticker.textContent = heads ? `${heads}    ·    ${heads}` : "";
+    }
+
+    if (!items.length) {
+      if (status) {
+        status.hidden = false;
+        status.textContent = T("news.unreachable");
+      }
+      root.innerHTML = "";
+      if (status) root.appendChild(status);
+      return;
+    }
+
+    const pool = items.slice();
+    const hero = take(pool, 1, (it) => it.image)[0] || take(pool, 1)[0];
+    if (!hero) {
+      if (status) {
+        status.hidden = false;
+        status.textContent = T("news.none");
+      }
+      root.innerHTML = "";
+      if (status) root.appendChild(status);
+      return;
+    }
+    const seconds = take(pool, 2, (it) => it.image);
+    if (seconds.length < 2) seconds.push(...take(pool, 2 - seconds.length));
+    const live = take(pool, 10);
+    const band = take(pool, 3, (it) => it.image);
+    if (band.length < 3) band.push(...take(pool, 3 - band.length));
+
+    const buckets = {
+      monde: [],
+      politique: [],
+      economie: [],
+      societe: [],
+      sport: [],
+      culture: [],
+      fil: [],
+    };
+    for (const it of pool) buckets[rubricOf(it)].push(it);
+
+    const frag = document.createDocumentFragment();
+
+    const top = document.createElement("section");
+    top.id = "top";
+    top.className = "pack-top";
+    top.appendChild(
+      storyLink(
+        hero,
+        "hero",
+        `<div class="hero-visual" data-source="${escAttr(hero.sourceId)}">
+           ${hero.image ? `<img class="hero-photo" src="${escAttr(hero.image)}" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+           <div class="hero-shade"></div>
+           <div class="hero-copy">
+             <span class="badge">${hero.source}${hero.category ? " · " + hero.category : ""}</span>
+             <h2 data-title></h2>
+             <p class="hero-sum" data-sum></p>
+             <span class="meta">${timeAgo(hero.publishedAt)}</span>
+           </div>
+         </div>`
+      )
+    );
+    const mid = document.createElement("div");
+    mid.className = "secondaries";
+    for (const it of seconds) {
+      mid.appendChild(
+        storyLink(
+          it,
+          "secondary",
+          `${thumbHtml(it, "card-img")}
+           <span class="badge">${it.source}</span>
+           <h3 data-title></h3>
+           <p data-sum></p>
+           <p class="meta">${timeAgo(it.publishedAt)}</p>`
+        )
+      );
+    }
+    top.appendChild(mid);
+    const wire = document.createElement("aside");
+    wire.className = "live-wire";
+    const wireTitle = document.createElement("p");
+    wireTitle.className = "wire-title";
+    wireTitle.textContent = T("live.title");
+    wire.appendChild(wireTitle);
+    live.forEach((it, i) => {
+      wire.appendChild(
+        storyLink(
+          it,
+          "wire-item",
+          `<em>${String(i + 1).padStart(2, "0")}</em>
+           ${thumbHtml(it)}
+           <div>
+             <h3 data-title></h3>
+             <span class="meta">${it.source} · ${timeAgo(it.publishedAt)}</span>
+           </div>`
+        )
+      );
+    });
+    top.appendChild(wire);
+    frag.appendChild(top);
+
+    const bandEl = document.createElement("section");
+    bandEl.className = "pack-band";
+    for (const it of band) {
+      bandEl.appendChild(
+        storyLink(
+          it,
+          "band-card",
+          `${thumbHtml(it, "card-img")}
+           <span class="badge">${it.category || it.source}</span>
+           <h3 data-title></h3>
+           <p class="meta">${it.source} · ${timeAgo(it.publishedAt)}</p>`
+        )
+      );
+    }
+    frag.appendChild(bandEl);
+
+    const specs = [
+      ["monde", "rubric.monde"],
+      ["politique", "rubric.politique"],
+      ["economie", "rubric.economie"],
+      ["societe", "rubric.societe"],
+      ["sport", "rubric.sport"],
+      ["culture", "rubric.culture"],
+    ];
+    const splitA = document.createElement("div");
+    splitA.className = "pack-split";
+    const splitB = document.createElement("div");
+    splitB.className = "pack-split";
+
+    specs.forEach(([id, labelKey], idx) => {
+      const list = buckets[id];
+      if (!list.length) return;
+      const feat = list.find((x) => x.image) || list[0];
+      const rest = list.filter((x) => x !== feat).slice(0, 6);
+      const shown = new Set([feat, ...rest]);
+      buckets[id] = list.filter((x) => !shown.has(x));
+      const block = rubricBlock(id, T(labelKey), rest, feat);
+      if (idx <= 1) frag.appendChild(block);
+      else if (idx <= 3) splitA.appendChild(block);
+      else splitB.appendChild(block);
+    });
+    if (splitA.children.length) frag.appendChild(splitA);
+    if (splitB.children.length) frag.appendChild(splitB);
+
+    const leftover = [...buckets.fil, ...specs.flatMap(([id]) => buckets[id])];
+    const fil = document.createElement("section");
+    fil.id = "fil";
+    fil.className = "pack-fil";
+    const filHead = document.createElement("div");
+    filHead.className = "section-rule";
+    const filSpan = document.createElement("span");
+    filSpan.textContent = T("rubric.fil");
+    filHead.appendChild(filSpan);
+    fil.appendChild(filHead);
+    const cols = document.createElement("div");
+    cols.className = "fil-cols";
+    leftover.forEach((it) => {
+      cols.appendChild(
+        storyLink(
+          it,
+          "fil-item",
+          `${thumbHtml(it)}
+           <div>
+             <span class="badge">${it.source}</span>
+             <h3 data-title></h3>
+             <span class="meta">${timeAgo(it.publishedAt)}</span>
+           </div>`
+        )
+      );
+    });
+    fil.appendChild(cols);
+    frag.appendChild(fil);
+
+    root.innerHTML = "";
+    root.appendChild(frag);
+  }
+
+  async function loadNews() {
+    const status = $("news-status");
     try {
       const res = await fetch("/api/news");
       const data = await res.json();
       const items = (data.items || []).slice();
       state.news = items;
-
-      if ($("source-count")) {
-        $("source-count").textContent = `${items.length} articles`;
-      }
-      const ticker = $("ticker");
-      if (ticker) {
-        const heads = items.slice(0, 18).map((it) => `${it.source} — ${it.title}`).join("    ·    ");
-        ticker.textContent = heads ? `${heads}    ·    ${heads}` : "";
-      }
-
-      if (!items.length) {
-        if (status) status.textContent = "Les flux sources sont momentanément injoignables.";
-        return;
-      }
-
-      const pool = items.slice();
-      const hero = take(pool, 1, (it) => it.image)[0] || take(pool, 1)[0];
-      if (!hero) {
-        if (status) status.textContent = "Aucun article à afficher pour le moment.";
-        return;
-      }
-      const seconds = take(pool, 2, (it) => it.image);
-      if (seconds.length < 2) seconds.push(...take(pool, 2 - seconds.length));
-      const live = take(pool, 10);
-      const band = take(pool, 3, (it) => it.image);
-      if (band.length < 3) band.push(...take(pool, 3 - band.length));
-
-      const buckets = {
-        monde: [],
-        politique: [],
-        economie: [],
-        societe: [],
-        sport: [],
-        culture: [],
-        fil: [],
-      };
-      for (const it of pool) buckets[rubricOf(it)].push(it);
-
-      const frag = document.createDocumentFragment();
-
-      const top = document.createElement("section");
-      top.id = "top";
-      top.className = "pack-top";
-      top.appendChild(
-        storyLink(
-          hero,
-          "hero",
-          `<div class="hero-visual" data-source="${escAttr(hero.sourceId)}">
-             ${hero.image ? `<img class="hero-photo" src="${escAttr(hero.image)}" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
-             <div class="hero-shade"></div>
-             <div class="hero-copy">
-               <span class="badge">${hero.source}${hero.category ? " · " + hero.category : ""}</span>
-               <h2 data-title></h2>
-               <p class="hero-sum" data-sum></p>
-               <span class="meta">${timeAgo(hero.publishedAt)}</span>
-             </div>
-           </div>`
-        )
-      );
-      const mid = document.createElement("div");
-      mid.className = "secondaries";
-      for (const it of seconds) {
-        mid.appendChild(
-          storyLink(
-            it,
-            "secondary",
-            `${thumbHtml(it, "card-img")}
-             <span class="badge">${it.source}</span>
-             <h3 data-title></h3>
-             <p data-sum></p>
-             <p class="meta">${timeAgo(it.publishedAt)}</p>`
-          )
-        );
-      }
-      top.appendChild(mid);
-      const wire = document.createElement("aside");
-      wire.className = "live-wire";
-      const wireTitle = document.createElement("p");
-      wireTitle.className = "wire-title";
-      wireTitle.textContent = "En continu";
-      wire.appendChild(wireTitle);
-      live.forEach((it, i) => {
-        wire.appendChild(
-          storyLink(
-            it,
-            "wire-item",
-            `<em>${String(i + 1).padStart(2, "0")}</em>
-             ${thumbHtml(it)}
-             <div>
-               <h3 data-title></h3>
-               <span class="meta">${it.source} · ${timeAgo(it.publishedAt)}</span>
-             </div>`
-          )
-        );
-      });
-      top.appendChild(wire);
-      frag.appendChild(top);
-
-      const bandEl = document.createElement("section");
-      bandEl.className = "pack-band";
-      for (const it of band) {
-        bandEl.appendChild(
-          storyLink(
-            it,
-            "band-card",
-            `${thumbHtml(it, "card-img")}
-             <span class="badge">${it.category || it.source}</span>
-             <h3 data-title></h3>
-             <p class="meta">${it.source} · ${timeAgo(it.publishedAt)}</p>`
-          )
-        );
-      }
-      frag.appendChild(bandEl);
-
-      const specs = [
-        ["monde", "Monde"],
-        ["politique", "Politique"],
-        ["economie", "Économie"],
-        ["societe", "Société"],
-        ["sport", "Sport"],
-        ["culture", "Culture"],
-      ];
-      const splitA = document.createElement("div");
-      splitA.className = "pack-split";
-      const splitB = document.createElement("div");
-      splitB.className = "pack-split";
-
-      specs.forEach(([id, label], idx) => {
-        const list = buckets[id];
-        if (!list.length) return;
-        const feat = list.find((x) => x.image) || list[0];
-        const rest = list.filter((x) => x !== feat).slice(0, 6);
-        const shown = new Set([feat, ...rest]);
-        buckets[id] = list.filter((x) => !shown.has(x));
-        const block = rubricBlock(id, label, rest, feat);
-        if (idx <= 1) frag.appendChild(block);
-        else if (idx <= 3) splitA.appendChild(block);
-        else splitB.appendChild(block);
-      });
-      if (splitA.children.length) frag.appendChild(splitA);
-      if (splitB.children.length) frag.appendChild(splitB);
-
-      const leftover = [...buckets.fil, ...specs.flatMap(([id]) => buckets[id])];
-      const fil = document.createElement("section");
-      fil.id = "fil";
-      fil.className = "pack-fil";
-      const filHead = document.createElement("div");
-      filHead.className = "section-rule";
-      const filSpan = document.createElement("span");
-      filSpan.textContent = "Toutes les dépêches";
-      filHead.appendChild(filSpan);
-      fil.appendChild(filHead);
-      const cols = document.createElement("div");
-      cols.className = "fil-cols";
-      leftover.forEach((it) => {
-        cols.appendChild(
-          storyLink(
-            it,
-            "fil-item",
-            `${thumbHtml(it)}
-             <div>
-               <span class="badge">${it.source}</span>
-               <h3 data-title></h3>
-               <span class="meta">${timeAgo(it.publishedAt)}</span>
-             </div>`
-          )
-        );
-      });
-      fil.appendChild(cols);
-      frag.appendChild(fil);
-
-      if (status) status.remove();
-      root.innerHTML = "";
-      root.appendChild(frag);
+      renderNews(items);
     } catch (err) {
       console.error("OKNO news", err);
       if (status) {
-        status.textContent =
-          "Les dépêches mettent un moment à arriver (le serveur gratuit se réveille). Rechargez la page dans une minute.";
+        status.hidden = false;
+        status.textContent = T("news.delay");
       }
     }
   }
@@ -640,50 +667,72 @@
     }
   }
 
-  async function initLab() {
+  function translateTheme(value) {
+    if (value === "dark" || value === "sombre") return T("theme.dark");
+    if (value === "light" || value === "clair") return T("theme.light");
+    if (value === "any" || value === "indifférent") return T("theme.any");
+    return value || T("cell.dash");
+  }
+
+  function translatePointer(value) {
+    if (value === "touch" || value === "tactile") return T("pointer.touch");
+    if (value === "mouse" || value === "souris") return T("pointer.mouse");
+    if (value === "unknown" || value === "inconnu") return T("pointer.unknown");
+    return value || T("cell.dash");
+  }
+
+  let labData = null;
+
+  function renderLabTable(data) {
     const tbody = $("visit-rows");
-    const pre = $("json-view");
     const count = $("visit-count");
     const empty = $("lab-empty");
+    if (count) count.textContent = T("lab.count", data.total);
+    if (tbody) {
+      tbody.innerHTML = "";
+      for (const v of data.visits) {
+        const tr = document.createElement("tr");
+        const dash = T("cell.dash");
+        const cells = [
+          new Intl.DateTimeFormat(dateLocale(), { dateStyle: "short", timeStyle: "medium" }).format(
+            new Date(v.recordedAt)
+          ),
+          v.ip || dash,
+          [v.geoIp?.city, v.geoIp?.country].filter(Boolean).join(", ") || dash,
+          v.language || dash,
+          v.keyboard?.layout || dash,
+          v.screen?.width && v.screen?.height ? `${v.screen.width}×${v.screen.height}` : dash,
+          [v.clientHints?.platform || v.platform, v.clientHints?.uaFullVersion ? "Chrome " + v.clientHints.uaFullVersion : null]
+            .filter(Boolean)
+            .join(" · ") || dash,
+          v.gpu?.renderer || dash,
+          translateTheme(v.theme?.colorScheme),
+          v.network?.effectiveType || dash,
+          v.geolocation
+            ? `${Number(v.geolocation.lat).toFixed(4)}, ${Number(v.geolocation.lon).toFixed(4)}`
+            : T("cell.ip-only"),
+          v.timezone || dash,
+        ];
+        for (const c of cells) {
+          const td = document.createElement("td");
+          td.textContent = c;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+    if (empty) empty.hidden = data.total > 0;
+  }
+
+  async function initLab() {
+    const pre = $("json-view");
 
     async function refresh() {
       const res = await fetch("/api/visits");
       const data = await res.json();
-      if (count) count.textContent = `${data.total} visite(s) dans data/visits.json`;
+      labData = data;
       if (pre) pre.textContent = JSON.stringify(data.visits, null, 2);
-      if (tbody) {
-        tbody.innerHTML = "";
-        for (const v of data.visits) {
-          const tr = document.createElement("tr");
-          const cells = [
-            new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "medium" }).format(
-              new Date(v.recordedAt)
-            ),
-            v.ip,
-            [v.geoIp?.city, v.geoIp?.country].filter(Boolean).join(", ") || "—",
-            v.language || "—",
-            v.keyboard?.layout || "—",
-            v.screen?.width && v.screen?.height ? `${v.screen.width}×${v.screen.height}` : "—",
-            [v.clientHints?.platform || v.platform, v.clientHints?.uaFullVersion ? "Chrome " + v.clientHints.uaFullVersion : null]
-              .filter(Boolean)
-              .join(" · ") || "—",
-            v.gpu?.renderer || "—",
-            v.theme?.colorScheme || "—",
-            v.network?.effectiveType || "—",
-            v.geolocation
-              ? `${Number(v.geolocation.lat).toFixed(4)}, ${Number(v.geolocation.lon).toFixed(4)}`
-              : "IP seulement",
-            v.timezone || "—",
-          ];
-          for (const c of cells) {
-            const td = document.createElement("td");
-            td.textContent = c;
-            tr.appendChild(td);
-          }
-          tbody.appendChild(tr);
-        }
-      }
-      if (empty) empty.hidden = data.total > 0;
+      renderLabTable(data);
     }
 
     $("btn-refresh")?.addEventListener("click", refresh);
@@ -691,11 +740,24 @@
       window.location.href = "/api/visits.json";
     });
     $("btn-clear")?.addEventListener("click", async () => {
-      if (!confirm("Effacer tout le fichier visits.json ?")) return;
+      if (!confirm(T("lab.confirm-clear"))) return;
       await fetch("/api/visits", { method: "DELETE" });
       refresh();
     });
     refresh();
+  }
+
+  if (window.OKNO) {
+    window.OKNO.onLangChange = () => {
+      renderToday();
+      if (state.client) renderWarning();
+      const status = $("record-status");
+      if (status && state.visit) {
+        status.textContent = T("record.saved", state.totalVisits);
+      }
+      if (state.news.length) renderNews(state.news);
+      if (labData) renderLabTable(labData);
+    };
   }
 
   if (document.body.dataset.page === "lab") initLab();
