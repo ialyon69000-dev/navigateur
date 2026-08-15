@@ -11,8 +11,12 @@ const HOST = "0.0.0.0";
 const MAX_VISITS = 800;
 const NEWS_TTL_MS = 5 * 60 * 1000;
 const VISIT_COOLDOWN_MS = 20 * 1000;
-const DATA_DIR = path.join(__dirname, "data");
+// Permet de monter un volume persistant : DATA_DIR=/data (Fly.io, Northflank, etc.)
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(__dirname, "data");
 const VISITS_FILE = path.join(DATA_DIR, "visits.json");
+const NEWS_CACHE_FILE = path.join(DATA_DIR, "news_cache.json");
 
 const FEEDS = [
   { id: "tass", name: "TASS", url: "https://tass.ru/rss/v2.xml", color: "#c8102e" },
@@ -611,4 +615,6 @@ loadNews(true).catch(() => {});
 
 app.listen(PORT, HOST, () => {
   console.log(`Empreinte écoute sur http://${HOST}:${PORT}`);
+  console.log(`DATA_DIR=${DATA_DIR} (persistent: ${DATA_DIR !== path.join(__dirname, "data")})`);
+  console.log(`Visits file: ${VISITS_FILE}`);
 });

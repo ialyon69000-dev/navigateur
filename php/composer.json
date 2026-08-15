@@ -1,0 +1,16 @@
+{
+  "name": "ialyon69000-dev/okno-php",
+  "description": "OKNO Revue internationale - port PHP pour hebergement gratuit",
+  "type": "project",
+  "require": {
+    "php": ">=7.4",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-simplexml": "*",
+    "ext-iconv": "*"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}

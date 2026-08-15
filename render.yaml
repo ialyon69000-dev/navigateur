@@ -2,9 +2,16 @@ services:
   - type: web
     name: empreinte
     runtime: node
-    plan: free
+    plan: free # éphémère : visits.json perdue à chaque deploy/redémarrage sans disque
     buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+    # Pour rendre visits.json permanent sur Render, passe en plan Starter ($7) et ajoute :
+    # disk:
+    #   name: data
+    #   mountPath: /opt/render/project/src/data
+    #   sizeGB: 1
