@@ -6,8 +6,9 @@
   const SUPPORTED = ["ru", "en"];
   const DEFAULT = "ru";
 
-  const RU_FLAG = "/images/ru.svg";
-  const UK_FLAG = "/images/en.svg";
+// Inline SVG flags as data URIs
+const RU_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3 2'%3E%3Crect width='3' height='2' fill='%23fff'/%3E%3Crect y='0.667' width='3' height='0.666' fill='%230039a6'/%3E%3Crect y='1.333' width='3' height='0.667' fill='%23d52b1e'/%3E%3C/svg%3E";
+const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3Crect width='60' height='30' fill='%23012169'/%3E%3Crect width='60' height='6' fill='%23fff' transform='translate(0,0)'/%3E%3Crect width='60' height='6' fill='%23fff' transform='translate(0,24)'/%3E%3Crect width='10' height='30' fill='%23fff' transform='translate(0,0)'/%3E%3Crect width='10' height='30' fill='%23fff' transform='translate(50,0)'/%3E%3Crect width='60' height='4' fill='%23C8102E' transform='translate(0,13)'/%3E%3Crect width='60' height='4' fill='%23C8102E' transform='translate(0,0)'/%3E%3Crect width='60' height='4' fill='%23C8102E' transform='translate(0,26)'/%3E%3Crect width='6' height='30' fill='%23C8102E' transform='translate(2,0)'/%3E%3Crect width='6' height='30' fill='%23C8102E' transform='translate(52,0)'/%3E%3C/svg%3E";
 
   const dict = {
     // top rail
