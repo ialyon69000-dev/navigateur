@@ -382,6 +382,12 @@ function buildSwitcher() {
 
   const wrap = document.createElement("div");
   wrap.className = "lang-switch";
+  wrap.style.setProperty("position", "fixed", "important");
+  wrap.style.setProperty("top", "0.7rem", "important");
+  wrap.style.setProperty("right", "0.9rem", "important");
+  wrap.style.setProperty("left", "auto", "important");
+  wrap.style.setProperty("bottom", "auto", "important");
+  wrap.style.setProperty("z-index", "10000", "important");
   wrap.setAttribute("role", "group");
   wrap.setAttribute("aria-label", "Language / Язык");
 
