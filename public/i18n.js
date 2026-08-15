@@ -7,7 +7,7 @@
   const DEFAULT = "ru";
 
   const RU_FLAG = "/images/ru.svg";
-  const UK_FLAG = "/images/en.svg";g";
+  const UK_FLAG = "/images/en.svg";
 
   const dict = {
     // top rail
