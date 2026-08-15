@@ -6,10 +6,8 @@
   const SUPPORTED = ["ru", "en"];
   const DEFAULT = "ru";
 
-  const RU_FLAG =
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3 2'%3E%3Crect width='3' height='2' fill='%23fff'/%3E%3Crect y='0.667' width='3' height='0.666' fill='%230039a6'/%3E%3Crect y='1.333' width='3' height='0.667' fill='%23d52b1e'/%3E%3C/svg%3E\")";
-  const UK_FLAG =
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3CclipPath id='t'%3E%3Cpath d='M0,0 v30 h60 v-30 z'/%3E%3C/clipPath%3E%3CclipPath id='s'%3E%3Cpath d='M30,15 h30 v15 z'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23t)'%3E%3Cpath d='M0,0 v30 h60 v-30 z' fill='%23012169'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' clip-path='url(%23s)' stroke='%23C8102E' stroke-width='4'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/g%3E%3C/svg%3E\")";
+  const RU_FLAG = "images/ru.svg";
+  const UK_FLAG = "images/en.svg";
 
   const dict = {
     // top rail
@@ -380,6 +378,41 @@
 
   function buildSwitcher() {
     if (document.querySelector(".lang-switch")) return;
+
+    // Inline styles for top-left positioned flags
+    const style = document.createElement("style");
+    style.textContent = `
+      .lang-switch {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 9999;
+        display: flex;
+        gap: 4px;
+      }
+      .lang-btn {
+        width: 24px;
+        height: 16px;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        border-radius: 2px;
+      }
+      .lang-btn:hover {
+        opacity: 0.8;
+      }
+      .lang-btn.is-active {
+        opacity: 1;
+        outline: 1px solid rgba(255,255,255,0.5);
+      }
+    `;
+    document.head.appendChild(style);
+
     const wrap = document.createElement("div");
     wrap.className = "lang-switch";
     wrap.setAttribute("role", "group");
@@ -390,7 +423,7 @@
       b.type = "button";
       b.className = "lang-btn";
       b.dataset.langBtn = lang;
-      b.style.backgroundImage = flag;
+      b.style.backgroundImage = `url("${flag}")`;
       b.setAttribute("aria-label", t(labelKey));
       b.setAttribute("title", t(labelKey));
       b.addEventListener("click", () => setLanguage(lang));
