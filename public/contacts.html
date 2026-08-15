@@ -3,50 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Контакты — ОКНО</title>
+  <title data-i18n="contacts.title">Контакты — ОКНО</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
+<body data-i18n-title="title.contacts">
   <header class="topbar">
-    <p class="topbar-msg"><a href="/">Вернуться к журналу</a></p>
+    <p class="topbar-msg"><a href="/" data-i18n="topbar.back">Вернуться к журналу</a></p>
   </header>
 
   <main class="lab">
-    <p class="kicker">Редакция</p>
-    <h1>Контакты</h1>
-    <p>
+    <p class="kicker" data-i18n="contacts.kicker">Редакция</p>
+    <h1 data-i18n="contacts.title">Контакты</h1>
+    <p data-i18n="contacts.intro">
       Связаться с редакцией «ОКНО» можно только одним способом — по электронной почте.
       Других адресов, телефонов и форм обратной связи у издания нет.
     </p>
 
     <div class="contact-card">
-      <p class="contact-label">Единственный контакт издания</p>
+      <p class="contact-label" data-i18n="contacts.label">Единственный контакт издания</p>
       <a class="contact-mail" href="mailto:alexei47@okho.ru">alexei47@okho.ru</a>
-      <p class="contact-note">
+      <p class="contact-note" data-i18n="contacts.note">
         Это единственный адрес «ОКНО». Сообщения, отправленные на другие адреса, до редакции не дойдут.
       </p>
     </div>
 
-    <h2>По каким вопросам писать</h2>
+    <h2 data-i18n="contacts.topics-title">По каким вопросам писать</h2>
     <ul>
-      <li>предложения и поправки к материалам;</li>
-      <li>вопросы о работе издания и об учебном проекте;</li>
-      <li>юридические запросы и обращения;</li>
-      <li>сотрудничество.</li>
+      <li data-i18n="contacts.topic-1">предложения и поправки к материалам;</li>
+      <li data-i18n="contacts.topic-2">вопросы о работе издания и об учебном проекте;</li>
+      <li data-i18n="contacts.topic-3">юридические запросы и обращения;</li>
+      <li data-i18n="contacts.topic-4">сотрудничество.</li>
     </ul>
 
-    <h2>Сроки ответа</h2>
-    <p>
+    <h2 data-i18n="contacts.reply-title">Сроки ответа</h2>
+    <p data-i18n="contacts.reply">
       Редакция читает все письма и старается отвечать в течение нескольких дней.
       Пожалуйста, кратко указывайте тему письма.
     </p>
 
-    <p><a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/informations-juridiques.html">Правовая информация</a></p>
+    <p data-i18n="contacts.links" data-i18n-html="1">
+      <a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/informations-juridiques.html">Правовая информация</a>
+    </p>
   </main>
+  <script src="/i18n.js"></script>
 </body>
 </html>

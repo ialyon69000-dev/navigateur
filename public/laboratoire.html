@@ -1,70 +1,72 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Laboratoire — ОКНО</title>
+  <title data-i18n="lab.title">Лаборатория — ОКНО</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23110f0c' width='32' height='32'/%3E%3Crect x='5' y='6' width='22' height='20' fill='none' stroke='%23d4a017' stroke-width='2'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body data-page="lab">
+<body data-page="lab" data-i18n-title="title.lab">
   <div class="grain" aria-hidden="true"></div>
   <header class="topbar">
     <p class="topbar-msg">
       <span class="pulse"></span>
-      Journal automatique — chaque ouverture de la page d’accueil écrit une ligne.
-      <a href="/">Retour au journal</a>
+      <span data-i18n="topbar.lab-msg">Автоматический журнал — каждый вход на главную добавляет строку.</span>
+      <a href="/" data-i18n="topbar.back">Вернуться к журналу</a>
     </p>
   </header>
 
   <main class="lab">
-    <p class="kicker">Journal des empreintes</p>
-    <h1>Laboratoire</h1>
-    <p>
-      Chaque ouverture de la page d’accueil écrit une ligne ici — sur le serveur Render,
-      pas dans le fichier GitHub. Rechargez après une visite.
-      Sur le plan gratuit, le fichier est <em>vidé</em> si le site s’endort ou redéploie.
+    <p class="kicker" data-i18n="lab.kicker">Журнал отпечатков</p>
+    <h1 data-i18n="lab.title">Лаборатория</h1>
+    <p data-i18n="lab.desc">
+      Каждое открытие главной страницы записывает сюда строку — на сервере Render,
+      а не в файле на GitHub. Обновите после визита. На бесплатном тарифе файл
+      очищается, когда сайт засыпает или передеплоивается.
     </p>
-    <p id="visit-count" class="meta">Chargement…</p>
+    <p id="visit-count" class="meta" data-i18n="lab.loading">Загрузка…</p>
 
     <div class="lab-actions">
-      <button type="button" class="btn btn-ghost" id="btn-refresh">Actualiser</button>
-      <button type="button" class="btn btn-solid" id="btn-download">Télécharger visits.json</button>
-      <button type="button" class="btn btn-danger" id="btn-clear">Vider le journal</button>
+      <button type="button" class="btn btn-ghost" id="btn-refresh" data-i18n="lab.refresh">Обновить</button>
+      <button type="button" class="btn btn-solid" id="btn-download" data-i18n="lab.download">Скачать visits.json</button>
+      <button type="button" class="btn btn-danger" id="btn-clear" data-i18n="lab.clear">Очистить журнал</button>
     </div>
 
-    <p id="lab-empty" class="news-status">Aucune visite enregistrée pour l’instant.</p>
+    <p id="lab-empty" class="news-status" data-i18n="lab.empty" hidden>Пока ни одного визита.</p>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>IP</th>
-            <th>Géo IP</th>
-            <th>Langue</th>
-            <th>Clavier</th>
-            <th>Écran</th>
-            <th>Système</th>
-            <th>GPU</th>
-            <th>Thème</th>
-            <th>Réseau</th>
-            <th>GPS</th>
-            <th>Fuseau</th>
+            <th data-i18n="th.date">Дата</th>
+            <th data-i18n="th.ip">IP</th>
+            <th data-i18n="th.geo">Гео IP</th>
+            <th data-i18n="th.lang">Язык</th>
+            <th data-i18n="th.keyboard">Клавиатура</th>
+            <th data-i18n="th.screen">Экран</th>
+            <th data-i18n="th.system">Система</th>
+            <th data-i18n="th.gpu">GPU</th>
+            <th data-i18n="th.theme">Тема</th>
+            <th data-i18n="th.network">Сеть</th>
+            <th data-i18n="th.gps">GPS</th>
+            <th data-i18n="th.tz">Часовой пояс</th>
           </tr>
         </thead>
         <tbody id="visit-rows"></tbody>
       </table>
     </div>
 
-    <h2 class="kicker" style="margin-top:1.6rem">Brut — visits.json</h2>
+    <h2 class="kicker" style="margin-top:1.6rem" data-i18n="lab.raw">Сырой лог — visits.json</h2>
     <pre class="json-block" id="json-view">[]</pre>
   </main>
 
   <div id="toast" class="toast" hidden></div>
+  <script src="/i18n.js"></script>
   <script src="/app.js"></script>
+</body>
 </html>
