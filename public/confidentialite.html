@@ -1,40 +1,42 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Confidentialité — ОКНО</title>
+  <title data-i18n="privacy.title">Конфиденциальность — ОКНО</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
+<body data-i18n-title="title.privacy">
   <header class="topbar">
-    <p class="topbar-msg"><a href="/">Retour au journal</a></p>
+    <p class="topbar-msg"><a href="/" data-i18n="topbar.back">Вернуться к журналу</a></p>
   </header>
   <main class="lab">
-    <p class="kicker">Information</p>
-    <h1>Confidentialité</h1>
-    <p>
-      ОКНО est un exercice de sensibilisation. Dès l’ouverture de la page,
-      le navigateur transmet des métadonnées qui sont écrites dans
-      <code>data/visits.json</code>. Un avertissement figure en bas de page.
+    <p class="kicker" data-i18n="privacy.kicker">Информация</p>
+    <h1 data-i18n="privacy.title">Конфиденциальность</h1>
+    <p data-i18n="privacy.intro" data-i18n-html="1">
+      «ОКНО» — это просветительское упражнение. При открытии страницы браузер передаёт метаданные, которые записываются в
+      <code>data/visits.json</code>. Предупреждение размещено в нижней части страницы.
     </p>
-    <h2>Données enregistrées automatiquement</h2>
+    <h2 data-i18n="privacy.data-title">Автоматически сохраняемые данные</h2>
     <ul>
-      <li>Adresse IP et géolocalisation approximative (ville / pays / FAI)</li>
-      <li>Langue(s) du navigateur</li>
-      <li>Disposition du clavier</li>
-      <li>Taille d’écran</li>
-      <li>Fuseau horaire, plateforme, user-agent</li>
+      <li data-i18n="privacy.data-ip">IP-адрес и приблизительная геолокация (город / страна / провайдер)</li>
+      <li data-i18n="privacy.data-lang">Язык(и) браузера</li>
+      <li data-i18n="privacy.data-keyboard">Раскладка клавиатуры</li>
+      <li data-i18n="privacy.data-screen">Размер экрана</li>
+      <li data-i18n="privacy.data-tz">Часовой пояс, платформа, user-agent</li>
     </ul>
-    <p>
-      La position GPS précise n’est pas demandée (cela imposerait une popup).
-      Réservé à un atelier interne, pas à une collecte occulte de tiers.
+    <p data-i18n="privacy.gps">
+      Точное местоположение GPS не запрашивается (это вызвало бы всплывающее окно).
+      Предназначено для внутреннего семинара, а не для скрытого сбора данных третьими лицами.
     </p>
-    <p><a href="/">Retour</a> · <a href="/laboratoire.html">Laboratoire</a> · <a href="/contacts.html">Contacts</a> · <a href="/informations-juridiques.html">Informations juridiques</a></p>
+    <p data-i18n="privacy.links" data-i18n-html="1">
+      <a href="/">Назад</a> · <a href="/laboratoire.html">Лаборатория</a> · <a href="/contacts.html">Контакты</a> · <a href="/informations-juridiques.html">Правовая информация</a>
+    </p>
   </main>
+  <script src="/i18n.js"></script>
 </body>
 </html>
