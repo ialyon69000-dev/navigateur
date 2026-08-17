@@ -637,23 +637,37 @@
   async function loadNews() {
     const status = $("news-status");
     try {
-      // GitHub Actions refreshes this public cache on main. Fetch it directly
-      // so the browser never depends on outbound HTTP being allowed by InfinityFree.
+      // Merge every reachable source so the feed never collapses to a few
+      // dispatches: the local InfinityFree endpoint (news.php, which embeds a
+      // 50+ snapshot) and the GitHub-main cache refreshed by Actions.
       const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + Math.floor(Date.now() / 300000);
-      let data;
-      try {
-        const cacheResponse = await fetch(cacheUrl, { cache: "no-store" });
-        if (!cacheResponse.ok) throw new Error("GitHub cache unavailable");
-        data = await cacheResponse.json();
-      } catch (_) {
-        // Keep the local InfinityFree cache as an offline fallback.
-        const res = await fetch("/api/news");
-        if (!res.ok) throw new Error("Local news cache unavailable");
-        data = await res.json();
+      const probes = [
+        fetch("/api/news").then((res) => {
+          if (!res.ok) throw new Error("Local news cache unavailable");
+          return res.json();
+        }),
+        fetch(cacheUrl, { cache: "no-store" }).then((res) => {
+          if (!res.ok) throw new Error("GitHub cache unavailable");
+          return res.json();
+        }),
+      ];
+      const results = await Promise.allSettled(probes);
+      const seen = new Set();
+      const merged = [];
+      for (const result of results) {
+        if (result.status !== "fulfilled" || !result.value) continue;
+        const items = Array.isArray(result.value.items) ? result.value.items : [];
+        for (const item of items) {
+          const key = String(item.title || "").toLowerCase().slice(0, 120);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          merged.push(item);
+        }
       }
-      const items = (data.items || []).slice();
-      state.news = items;
-      renderNews(items);
+      merged.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+      if (!merged.length) throw new Error("No news source available");
+      state.news = merged;
+      renderNews(merged);
     } catch (err) {
       console.error("OKNO news", err);
       if (status) {
