@@ -637,8 +637,20 @@
   async function loadNews() {
     const status = $("news-status");
     try {
-      const res = await fetch("/api/news");
-      const data = await res.json();
+      // GitHub Actions refreshes this public cache. Fetch it directly so the
+      // browser never depends on outbound HTTP being allowed by InfinityFree.
+      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/arena/01a01112-navigateur/infinityfree/htdocs/data/news_cache.json?t=" + Math.floor(Date.now() / 300000);
+      let data;
+      try {
+        const cacheResponse = await fetch(cacheUrl, { cache: "no-store" });
+        if (!cacheResponse.ok) throw new Error("GitHub cache unavailable");
+        data = await cacheResponse.json();
+      } catch (_) {
+        // Keep the local InfinityFree cache as an offline fallback.
+        const res = await fetch("/api/news");
+        if (!res.ok) throw new Error("Local news cache unavailable");
+        data = await res.json();
+      }
       const items = (data.items || []).slice();
       state.news = items;
       renderNews(items);
