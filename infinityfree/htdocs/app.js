@@ -637,9 +637,9 @@
   async function loadNews() {
     const status = $("news-status");
     try {
-      // GitHub Actions refreshes this public cache. Fetch it directly so the
-      // browser never depends on outbound HTTP being allowed by InfinityFree.
-      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/arena/01a01112-navigateur/infinityfree/htdocs/data/news_cache.json?t=" + Math.floor(Date.now() / 300000);
+      // GitHub Actions refreshes this public cache on main. Fetch it directly
+      // so the browser never depends on outbound HTTP being allowed by InfinityFree.
+      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + Math.floor(Date.now() / 300000);
       let data;
       try {
         const cacheResponse = await fetch(cacheUrl, { cache: "no-store" });
