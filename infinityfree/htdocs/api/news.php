@@ -22,8 +22,18 @@ function charsetOf($contentType, $xmlHead) {
     return $cs;
 }
 
+function safeSubstr($value, $start, $length = null) {
+    $value = (string)$value;
+    if (function_exists('mb_substr')) return $length === null ? mb_substr($value, $start) : mb_substr($value, $start, $length);
+    return $length === null ? substr($value, $start) : substr($value, $start, $length);
+}
+
+function safeLower($value) {
+    return function_exists('mb_strtolower') ? mb_strtolower((string)$value) : strtolower((string)$value);
+}
+
 function looksBrokenCyrillic($s) {
-    $sample = mb_substr((string)$s, 0, 3000);
+    $sample = safeSubstr((string)$s, 0, 3000);
     preg_match_all('/[А-Яа-яЁё]/u', $sample, $m);
     $cyr = count($m[0]);
     $repl = substr_count($sample, '�');
@@ -165,6 +175,9 @@ function fetchFeedPhp($feed, $prefetched = null) {
     $xml = preg_replace('/[^\\x{0009}\\x{000A}\\x{000D}\\x{0020}-\\x{D7FF}\\x{E000}-\\x{FFFD}\\x{10000}-\\x{10FFFF}]/u', '', $xml);
 
     libxml_use_internal_errors(true);
+    if (!function_exists('simplexml_load_string')) {
+        throw new Exception('L’extension PHP SimpleXML est indisponible sur cet hébergement');
+    }
     $sxml = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA);
     if (!$sxml) {
         throw new Exception('XML parse failed for ' . $feed['name']);
@@ -221,7 +234,7 @@ function fetchFeedPhp($feed, $prefetched = null) {
         $descHtml = '';
         if (isset($it->description)) $descHtml = (string)$it->description;
         elseif (isset($it->children('content', true)->encoded)) $descHtml = (string)$it->children('content', true)->encoded;
-        $summary = mb_substr(stripHtmlCustom($descHtml ?: $title), 0, 280);
+        $summary = safeSubstr(stripHtmlCustom($descHtml ?: $title), 0, 280);
 
         $assoc = [
             'enclosure_url' => $enclosureUrl,
@@ -286,7 +299,9 @@ foreach ($FEEDS as $index => $feed) {
         // bounded as well, instead of allowing a request to run indefinitely.
         $items = fetchFeedPhp($feed, $downloads !== null ? $downloads[$index] : null);
         $allItems = array_merge($allItems, $items);
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
+        // PHP raises Error (not Exception) when a shared host misses an
+        // extension.  Keep answering JSON so the frontend can recover.
         $errors[] = ['source' => $feed['name'], 'error' => $e->getMessage()];
     }
 }
@@ -300,7 +315,7 @@ usort($allItems, function($a,$b){
 $seen = [];
 $unique = [];
 foreach ($allItems as $it) {
-    $key = mb_strtolower(mb_substr($it['title'] ?? '', 0, 80));
+    $key = safeLower(safeSubstr($it['title'] ?? '', 0, 80));
     if (isset($seen[$key])) continue;
     $seen[$key] = true;
     $unique[] = $it;
