@@ -270,14 +270,17 @@ $cache = null;
 if (file_exists($NEWS_CACHE_FILE) && !$force) {
     $raw = @file_get_contents($NEWS_CACHE_FILE);
     $j = json_decode($raw, true);
-    if ($j && isset($j['at']) && ($nowMs - $j['at'] < 5*60*1000) && !empty($j['items'])) {
+    // Never make a visitor wait for remote publishers. A populated cache is
+    // served immediately, even when old; use ?refresh=1 to attempt an update.
+    // This is deliberately resilient to restrictive free-hosting networks.
+    if ($j && !empty($j['items'])) {
         $cache = $j;
     }
 }
 $staleCache = isset($j) && is_array($j) && !empty($j['items']) ? $j : null;
 if ($cache) {
     header('Content-Type: application/json; charset=utf-8');
-    header('X-Cache: HIT');
+    header('X-Cache: ' . (($nowMs - (int)($cache['at'] ?? 0) < 5*60*1000) ? 'HIT' : 'STALE'));
     echo json_encode([
         'updatedAt' => gmdate('c', (int)($cache['at']/1000)),
         'sources' => array_map(function($f){ return ['id'=>$f['id'],'name'=>$f['name']]; }, $FEEDS),
