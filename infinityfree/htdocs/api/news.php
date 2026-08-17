@@ -76,8 +76,63 @@ function guessImage($link, $feedId, $picked) {
     return null;
 }
 
-function fetchFeedPhp($feed) {
-    list($buf, $ctype) = httpFetch($feed['url'], 12);
+/**
+ * Download every RSS file at the same time.  Free shared hosting has a short
+ * request limit; fetching seven sources one after another could therefore
+ * take 84 seconds and Apache would kill /api/news before it sent JSON.
+ */
+function fetchFeedsInParallel($feeds, $timeout = 8) {
+    if (!function_exists('curl_multi_init')) return null;
+
+    $multi = curl_multi_init();
+    $handles = [];
+    foreach ($feeds as $index => $feed) {
+        $ch = curl_init($feed['url']);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_USERAGENT => 'OKNO/1.1 RSS reader',
+            CURLOPT_HTTPHEADER => ['Accept: application/rss+xml, application/xml, text/xml, */*'],
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        curl_multi_add_handle($multi, $ch);
+        $handles[$index] = $ch;
+    }
+
+    $running = null;
+    do {
+        $status = curl_multi_exec($multi, $running);
+        if ($running) curl_multi_select($multi, 0.5);
+    } while ($running && $status === CURLM_OK);
+
+    $results = [];
+    foreach ($handles as $index => $ch) {
+        $body = curl_multi_getcontent($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $type = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $error = curl_error($ch);
+        if ($body === false || $code >= 400 || $code === 0) {
+            $results[$index] = ['error' => $error ?: ('http ' . $code)];
+        } else {
+            $results[$index] = ['body' => $body, 'contentType' => $type];
+        }
+        curl_multi_remove_handle($multi, $ch);
+        curl_close($ch);
+    }
+    curl_multi_close($multi);
+    return $results;
+}
+
+function fetchFeedPhp($feed, $prefetched = null) {
+    if ($prefetched !== null) {
+        $buf = $prefetched['body'];
+        $ctype = $prefetched['contentType'];
+    } else {
+        list($buf, $ctype) = httpFetch($feed['url'], 5);
+    }
     // buf is binary string
     $head = substr($buf, 0, 220);
     $charset = charsetOf($ctype, $head);
@@ -206,6 +261,7 @@ if (file_exists($NEWS_CACHE_FILE) && !$force) {
         $cache = $j;
     }
 }
+$staleCache = isset($j) && is_array($j) && !empty($j['items']) ? $j : null;
 if ($cache) {
     header('Content-Type: application/json; charset=utf-8');
     header('X-Cache: HIT');
@@ -220,9 +276,15 @@ if ($cache) {
 
 $allItems = [];
 $errors = [];
-foreach ($FEEDS as $feed) {
+$downloads = fetchFeedsInParallel($FEEDS);
+foreach ($FEEDS as $index => $feed) {
     try {
-        $items = fetchFeedPhp($feed);
+        if ($downloads !== null && !empty($downloads[$index]['error'])) {
+            throw new Exception($downloads[$index]['error']);
+        }
+        // curl_multi is unavailable on a few PHP builds.  Keep that fallback
+        // bounded as well, instead of allowing a request to run indefinitely.
+        $items = fetchFeedPhp($feed, $downloads !== null ? $downloads[$index] : null);
         $allItems = array_merge($allItems, $items);
     } catch (Exception $e) {
         $errors[] = ['source' => $feed['name'], 'error' => $e->getMessage()];
@@ -255,6 +317,20 @@ foreach ($unique as $it) {
     } else $leftover[] = $it;
 }
 $final = array_slice(array_merge($balanced, $leftover), 0, 120);
+
+// A stale but populated feed is much more useful than an empty page when the
+// host temporarily blocks outgoing connections to the publishers.
+if (empty($final) && $staleCache) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('X-Cache: STALE');
+    echo json_encode([
+        'updatedAt' => gmdate('c', (int)($staleCache['at'] / 1000)),
+        'sources' => array_map(function($f){ return ['id'=>$f['id'],'name'=>$f['name']]; }, $FEEDS),
+        'items' => $staleCache['items'],
+        'errors' => $errors,
+    ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 $payload = [
     'at' => $nowMs,

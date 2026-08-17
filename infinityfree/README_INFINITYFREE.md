@@ -44,6 +44,13 @@ Le frontend `app.js` reste identique, il appelle `/api/me`, `/api/news`, `/api/v
 3. Dans cPanel InfinityFree, chmod 666 sur `htdocs/data/visits.json` et `news_cache.json` (ou 777 sur dossier `data` si bloqué)
 4. PHP version 8.1 ou 8.2 recommandée
 5. Teste : `https://tondomaine/api/health` → `{"ok":true}`
+6. Vérifie ensuite `https://tondomaine/api/news` : la réponse doit être du JSON avec un tableau `items` non vide.
+
+### Correctif de délai RSS
+
+`api/news.php` télécharge désormais les sept flux RSS **en parallèle** (maximum huit secondes), au lieu de les attendre l’un après l’autre. C’est important sur InfinityFree : l’ancienne séquence pouvait dépasser la limite d’exécution PHP et produire une réponse vide. Si les sites de presse sont temporairement inaccessibles, le dernier fil non vide est conservé et affiché (`X-Cache: STALE`) plutôt que de vider la page.
+
+Après avoir mis à jour le site, remplace impérativement `htdocs/api/news.php` sur le serveur. Il n’est pas nécessaire de modifier `.htaccess`. Une première requête à `/api/news` peut prendre jusqu’à huit secondes afin de créer le cache, les suivantes seront servies depuis le cache pendant cinq minutes.
 
 ## 3 stratégies possibles
 
