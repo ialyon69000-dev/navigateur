@@ -656,7 +656,11 @@
         if (result.status !== "fulfilled" || !result.value) continue;
         const items = Array.isArray(result.value.items) ? result.value.items : [];
         for (const item of items) {
-          const key = String(item.title || "").toLowerCase().slice(0, 120);
+          const title = String(item.title || "");
+          const cyr = (title.match(/[А-Яа-яЁё]/g) || []).length;
+          const bad = (title.match(/[?�]/g) || []).length;
+          if (cyr < 2 && bad >= 3) continue;
+          const key = title.toLowerCase().slice(0, 120);
           if (!key || seen.has(key)) continue;
           seen.add(key);
           merged.push(item);

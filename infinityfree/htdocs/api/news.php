@@ -95,6 +95,98 @@ function news_sort_by_date($a, $b) {
     return ($ta > $tb) ? -1 : 1;
 }
 
+function news_cp1251_to_utf8($raw) {
+    static $map = null;
+    if ($map === null) {
+        $special = array(
+            0x80 => 0x0402, 0x81 => 0x0403, 0x82 => 0x201A, 0x83 => 0x0453,
+            0x84 => 0x201E, 0x85 => 0x2026, 0x86 => 0x2020, 0x87 => 0x2021,
+            0x88 => 0x20AC, 0x89 => 0x2030, 0x8A => 0x0409, 0x8B => 0x2039,
+            0x8C => 0x040A, 0x8D => 0x040C, 0x8E => 0x040B, 0x8F => 0x040F,
+            0x90 => 0x0452, 0x91 => 0x2018, 0x92 => 0x2019, 0x93 => 0x201C,
+            0x94 => 0x201D, 0x95 => 0x2022, 0x96 => 0x2013, 0x97 => 0x2014,
+            0x99 => 0x2122, 0x9A => 0x0459, 0x9B => 0x203A, 0x9C => 0x045A,
+            0x9D => 0x045C, 0x9E => 0x045B, 0x9F => 0x045F, 0xA0 => 0x00A0,
+            0xA1 => 0x040E, 0xA2 => 0x045E, 0xA3 => 0x0408, 0xA4 => 0x00A4,
+            0xA5 => 0x0490, 0xA6 => 0x00A6, 0xA7 => 0x00A7, 0xA8 => 0x0401,
+            0xA9 => 0x00A9, 0xAA => 0x0404, 0xAB => 0x00AB, 0xAC => 0x00AC,
+            0xAD => 0x00AD, 0xAE => 0x00AE, 0xAF => 0x0407, 0xB0 => 0x00B0,
+            0xB1 => 0x00B1, 0xB2 => 0x0406, 0xB3 => 0x0456, 0xB4 => 0x0491,
+            0xB5 => 0x00B5, 0xB6 => 0x00B6, 0xB7 => 0x00B7, 0xB8 => 0x0451,
+            0xB9 => 0x2116, 0xBA => 0x0454, 0xBB => 0x00BB, 0xBC => 0x0458,
+            0xBD => 0x0405, 0xBE => 0x0455, 0xBF => 0x0457,
+        );
+        $map = $special;
+        for ($b = 0xC0; $b <= 0xFF; $b++) {
+            $map[$b] = 0x0410 + ($b - 0xC0);
+        }
+    }
+    $out = '';
+    $len = strlen($raw);
+    for ($i = 0; $i < $len; $i++) {
+        $b = ord($raw[$i]);
+        if ($b < 0x80) {
+            $out .= $raw[$i];
+            continue;
+        }
+        if (!isset($map[$b])) {
+            continue;
+        }
+        $cp = $map[$b];
+        if ($cp < 0x800) {
+            $out .= chr(0xC0 | ($cp >> 6)) . chr(0x80 | ($cp & 0x3F));
+        } else {
+            $out .= chr(0xE0 | ($cp >> 12)) . chr(0x80 | (($cp >> 6) & 0x3F)) . chr(0x80 | ($cp & 0x3F));
+        }
+    }
+    return $out;
+}
+
+function news_cyr_count($text) {
+    return preg_match_all('/[А-Яа-яЁё]/u', (string) $text);
+}
+
+function news_is_garbled($text) {
+    $text = (string) $text;
+    $cyr = news_cyr_count($text);
+    $bad = substr_count($text, '?') + substr_count($text, "\xEF\xBF\xBD");
+    return $cyr < 2 && $bad >= 3;
+}
+
+function news_decode_xml($raw, $feedId) {
+    if ($raw === null || $raw === '') {
+        return $raw;
+    }
+    $head = substr($raw, 0, 280);
+    $declared = '';
+    if (preg_match('/encoding=["\']([^"\']+)["\']/i', $head, $m)) {
+        $declared = strtolower($m[1]);
+    }
+    $force1251 = ($feedId === 'gazeta' || strpos($declared, '1251') !== false || strpos($declared, 'cp1251') !== false);
+    if ($force1251) {
+        if (function_exists('iconv')) {
+            $converted = @iconv('WINDOWS-1251', 'UTF-8//IGNORE', $raw);
+            if ($converted && news_cyr_count($converted) >= 10) {
+                $raw = $converted;
+            } else {
+                $raw = news_cp1251_to_utf8($raw);
+            }
+        } elseif (function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($raw, 'UTF-8', 'Windows-1251');
+            $raw = ($converted && news_cyr_count($converted) >= 10) ? $converted : news_cp1251_to_utf8($raw);
+        } else {
+            $raw = news_cp1251_to_utf8($raw);
+        }
+    } elseif (news_cyr_count($raw) < 10) {
+        $converted = news_cp1251_to_utf8($raw);
+        if (news_cyr_count($converted) > news_cyr_count($raw)) {
+            $raw = $converted;
+        }
+    }
+    $raw = preg_replace('/encoding=["\'][^"\']+["\']/i', 'encoding="UTF-8"', $raw, 1);
+    return $raw;
+}
+
 function news_strip($text) {
     $flags = ENT_QUOTES;
     if (defined('ENT_HTML5')) {
@@ -120,19 +212,14 @@ function news_parse_rss($xml, $feed) {
     if (!$xml) {
         return $items;
     }
-    if (!preg_match('/[А-Яа-яЁё]/u', $xml) && function_exists('iconv')) {
-        $converted = @iconv('WINDOWS-1251', 'UTF-8//IGNORE', $xml);
-        if ($converted && preg_match('/[А-Яа-яЁё]/u', $converted)) {
-            $xml = $converted;
-        }
-    }
+    $xml = news_decode_xml($xml, $feed['id']);
     if (!preg_match_all('/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/i', $xml, $blocks)) {
         return $items;
     }
     foreach (array_slice($blocks[1], 0, 24) as $block) {
         $title = news_strip(news_tag($block, 'title'));
         $link = news_strip(news_tag($block, 'link'));
-        if ($title === '') {
+        if ($title === '' || news_is_garbled($title)) {
             continue;
         }
         $pub = news_tag($block, 'pubDate');
@@ -263,7 +350,7 @@ function news_merge($primary, $fallback, $minItems) {
         if (count($items) >= $minItems) {
             break;
         }
-        if (empty($item['title'])) {
+        if (empty($item['title']) || news_is_garbled($item['title'])) {
             continue;
         }
         $key = strtolower($item['title']);

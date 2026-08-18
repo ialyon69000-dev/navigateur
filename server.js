@@ -2,9 +2,9 @@
 
 const express = require("express");
 const Parser = require("rss-parser");
-const iconv = require("iconv-lite");
 const fs = require("fs");
 const path = require("path");
+const { decodeRssBuffer, isGarbledText } = require("./lib/rss-decode");
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = "0.0.0.0";
@@ -268,25 +268,6 @@ function guessImage(item, feedId, picked) {
   return null;
 }
 
-function charsetOf(contentType, xmlHead) {
-  const fromHeader = String(contentType || "").match(/charset=([^\s;]+)/i);
-  const fromXml = String(xmlHead || "").match(/encoding=["']([^"']+)["']/i);
-  let cs = ((fromHeader && fromHeader[1]) || (fromXml && fromXml[1]) || "utf-8")
-    .trim()
-    .replace(/["']/g, "")
-    .toLowerCase();
-  if (cs === "cp1251" || cs === "windows-1251" || cs === "win-1251") return "win1251";
-  if (cs === "utf8") return "utf-8";
-  return cs;
-}
-
-function looksBrokenCyrillic(s) {
-  const sample = String(s || "").slice(0, 3000);
-  const cyr = (sample.match(/[А-Яа-яЁё]/g) || []).length;
-  const repl = (sample.match(/�/g) || []).length;
-  return cyr < 10 || repl > 4;
-}
-
 async function fetchFeed(feed) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12000);
@@ -300,23 +281,22 @@ async function fetchFeed(feed) {
   clearTimeout(timer);
   if (!res.ok) throw new Error("http " + res.status);
   const buf = Buffer.from(await res.arrayBuffer());
-  const headAscii = buf.subarray(0, 220).toString("latin1");
-  let xml = iconv.decode(buf, charsetOf(res.headers.get("content-type"), headAscii));
-  if (looksBrokenCyrillic(xml)) xml = iconv.decode(buf, "win1251");
-  xml = xml.replace(/^\uFEFF/, "");
+  const xml = decodeRssBuffer(buf, res.headers.get("content-type"), feed.id);
   const parsed = await parser.parseString(xml);
-  return (parsed.items || []).slice(0, 24).map((item) => ({
-    id: item.guid || item.link || `${feed.id}-${item.title}`,
-    title: stripHtml(item.title) || "(sans titre)",
-    link: item.link || parsed.link || "#",
-    source: feed.name,
-    sourceId: feed.id,
-    color: feed.color,
-    category: stripHtml(item.categories && item.categories[0]) || stripHtml(item.category) || null,
-    publishedAt: item.isoDate || item.pubDate || null,
-    summary: stripHtml(item.contentSnippet || item.summary || item.description).slice(0, 280),
-    image: guessImage(item, feed.id, pickImage(item)),
-  }));
+  return (parsed.items || []).slice(0, 24)
+    .map((item) => ({
+      id: item.guid || item.link || `${feed.id}-${item.title}`,
+      title: stripHtml(item.title) || "(sans titre)",
+      link: item.link || parsed.link || "#",
+      source: feed.name,
+      sourceId: feed.id,
+      color: feed.color,
+      category: stripHtml(item.categories && item.categories[0]) || stripHtml(item.category) || null,
+      publishedAt: item.isoDate || item.pubDate || null,
+      summary: stripHtml(item.contentSnippet || item.summary || item.description).slice(0, 280),
+      image: guessImage(item, feed.id, pickImage(item)),
+    }))
+    .filter((item) => !isGarbledText(item.title));
 }
 
 async function loadNews(force) {
@@ -339,6 +319,7 @@ async function loadNews(force) {
   const seen = new Set();
   const unique = [];
   for (const it of items) {
+    if (isGarbledText(it.title)) continue;
     const key = (it.title || "").toLowerCase().slice(0, 80);
     if (seen.has(key)) continue;
     seen.add(key);
