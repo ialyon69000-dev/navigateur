@@ -2,18 +2,17 @@
 /*
  * Emergency-safe news endpoint for restrictive shared PHP hosting.
  *
- * Always answers with the last known dispatches. When the local cache is
- * older than STALE_SECONDS it first tries the seven RSS feeds in parallel
- * (4 s timeout), then the GitHub-main snapshot. A failed refresh never
- * wipes the last good file.
+ * Always answers with the last known dispatches immediately. RSS is only
+ * fetched when refresh=1 (background) or when the cache is empty, so the
+ * page never waits on outbound feeds.
  */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, max-age=0');
 header('X-Content-Type-Options: nosniff');
 
 $MIN_ITEMS = 50;
-$STALE_SECONDS = 90;
-$REMOTE_RETRY_SECONDS = 45;
+$STALE_SECONDS = 3 * 60;
+$REMOTE_RETRY_SECONDS = 90;
 $DATA_DIR = dirname(__FILE__) . '/../data';
 $cacheFile = $DATA_DIR . '/news_cache.json';
 $embeddedFile = $DATA_DIR . '/news_embedded.json';
@@ -268,7 +267,7 @@ function news_fetch_rss($feeds) {
             curl_setopt_array($ch, array(
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_TIMEOUT => 4,
+                CURLOPT_TIMEOUT => 3,
                 CURLOPT_CONNECTTIMEOUT => 2,
                 CURLOPT_USERAGENT => 'OKNO news cache/1.1',
                 CURLOPT_HTTPHEADER => array('Accept: application/rss+xml, application/xml, text/xml, */*'),
@@ -297,7 +296,7 @@ function news_fetch_rss($feeds) {
         curl_multi_close($mh);
     } else {
         foreach ($feeds as $i => $feed) {
-            $body = news_http_get($feed['url'], 4);
+            $body = news_http_get($feed['url'], 3);
             if ($body) {
                 $bodies[$i] = $body;
             } else {
@@ -386,7 +385,7 @@ if ($shouldPull && $canRetry) {
         $data = $live;
         $mode = 'RSS';
     }
-    if ($mode !== 'RSS') foreach ($REMOTE_URLS as $url) {
+    if ($mode !== 'RSS' && $cacheEmpty) foreach ($REMOTE_URLS as $url) {
         $body = news_http_get($url, 5);
         $remote = $body ? @json_decode($body, true) : null;
         if (!is_array($remote) || empty($remote['items']) || !is_array($remote['items'])) {

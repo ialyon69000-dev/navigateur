@@ -654,7 +654,7 @@
     const status = $("news-status");
     try {
       const bust = Date.now();
-      const refresh = forceRefresh === false ? "" : "&refresh=1";
+      const refresh = forceRefresh ? "&refresh=1" : "";
       const res = await fetch("/api/news?t=" + bust + refresh, { cache: "no-store" });
       if (!res.ok) throw new Error("Local news unavailable");
       const payload = await res.json();
@@ -701,16 +701,16 @@
     const tick = () => {
       if (document.visibilityState === "hidden") return;
       n += 1;
-      loadNews(n % 2 === 0).catch((err) => console.error("news", err));
+      loadNews(n % 4 === 0).catch((err) => console.error("news", err));
     };
-    setInterval(tick, 45 * 1000);
+    setInterval(tick, 30 * 1000);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") tick();
     });
   }
 
   async function initHome() {
-    loadNews(true).catch((err) => console.error("news", err));
+    loadNews(false).then(() => loadNews(true)).catch((err) => console.error("news", err));
     startNewsPolling();
     try {
       await loadMeAndClient();

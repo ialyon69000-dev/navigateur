@@ -308,7 +308,7 @@ async function fetchFeed(feed) {
 
 async function loadNews(force) {
   const now = Date.now();
-  if (!force && newsCache.items.length && now - newsCache.at < NEWS_TTL_MS) {
+  if (!force && newsCache.items.length) {
     return newsCache;
   }
   const results = await Promise.allSettled(FEEDS.map((f) => fetchFeed(f)));
