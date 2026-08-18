@@ -14,6 +14,11 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     // top rail
     "rail.seven": { ru: "Семь редакций", en: "Seven newsrooms" },
     "rail.edition": { ru: "Вечерний выпуск", en: "Evening edition" },
+    "rail.live": { ru: "Прямой эфир", en: "Live" },
+    "rail.updated": {
+      ru: (t) => `обновлено ${t}`,
+      en: (t) => `updated ${t}`,
+    },
     "rail.articles": { ru: (n) => `${n} статей`, en: (n) => `${n} articles` },
 
     // mast

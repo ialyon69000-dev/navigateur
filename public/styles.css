@@ -150,6 +150,26 @@ body > .lang-switch {
   border-radius: 50%;
   background: var(--gold);
 }
+.rail-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--crimson);
+}
+.rail-live::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--crimson);
+  box-shadow: 0 0 0 0 rgba(158, 27, 27, 0.55);
+  animation: livepulse 1.6s ease-out infinite;
+}
+@keyframes livepulse {
+  0% { box-shadow: 0 0 0 0 rgba(158, 27, 27, 0.45); }
+  70% { box-shadow: 0 0 0 6px rgba(158, 27, 27, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(158, 27, 27, 0); }
+}
 
 .mast {
   display: block;

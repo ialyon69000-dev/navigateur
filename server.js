@@ -9,7 +9,7 @@ const { decodeRssBuffer, isGarbledText } = require("./lib/rss-decode");
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = "0.0.0.0";
 const MAX_VISITS = 800;
-const NEWS_TTL_MS = 5 * 60 * 1000;
+const NEWS_TTL_MS = 90 * 1000;
 const VISIT_COOLDOWN_MS = 20 * 1000;
 // Permet de monter un volume persistant : DATA_DIR=/data (Fly.io, Northflank, etc.)
 const DATA_DIR = process.env.DATA_DIR
@@ -62,10 +62,17 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  if (req.path === "/" || req.path.endsWith(".html") || req.path.endsWith(".js")) {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+  }
+  next();
+});
+
 app.use(
   express.static(path.join(__dirname, "public"), {
     extensions: ["html"],
-    maxAge: process.env.NODE_ENV === "production" ? "1h" : 0,
+    maxAge: 0,
   })
 );
 
@@ -627,7 +634,11 @@ app.get("/api/health", (_req, res) => {
 });
 
 ensureDataFile();
-loadNews(true).catch(() => {});
+seedNewsCache();
+loadNews(true).catch((err) => console.error("news startup", err.message || err));
+setInterval(() => {
+  loadNews(true).catch((err) => console.error("news refresh", err.message || err));
+}, NEWS_TTL_MS);
 
 app.listen(PORT, HOST, () => {
   console.log(`Empreinte écoute sur http://${HOST}:${PORT}`);

@@ -634,16 +634,30 @@
     root.appendChild(frag);
   }
 
-  async function loadNews() {
+  function newsSignature(items) {
+    return items.slice(0, 24).map((it) => it.id || it.title).join("|");
+  }
+
+  function markNewsUpdated() {
+    const el = $("news-updated");
+    if (!el) return;
+    const clock = new Intl.DateTimeFormat(dateLocale(), {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Europe/Moscow",
+    }).format(new Date());
+    el.textContent = T("rail.updated", clock);
+  }
+
+  async function loadNews(forceRefresh) {
     const status = $("news-status");
     try {
-      // Merge every reachable source so the feed never collapses to a few
-      // dispatches: the local InfinityFree endpoint (news.php, which pulls
-      // the GitHub snapshot when stale) and the GitHub-main cache itself.
-      const bust = Math.floor(Date.now() / 180000);
+      const bust = Date.now();
+      const refresh = forceRefresh ? "&refresh=1" : "";
       const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + bust;
       const probes = [
-        fetch("/api/news?t=" + bust, { cache: "no-store" }).then((res) => {
+        fetch("/api/news?t=" + bust + refresh, { cache: "no-store" }).then((res) => {
           if (!res.ok) throw new Error("Local news cache unavailable");
           return res.json();
         }),
@@ -671,8 +685,16 @@
       }
       merged.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
       if (!merged.length) throw new Error("No news source available");
+      const nextSig = newsSignature(merged);
+      const changed = nextSig !== state.newsSig;
       state.news = merged;
-      renderNews(merged);
+      state.newsSig = nextSig;
+      if (changed || !$("top")) {
+        const y = window.scrollY;
+        renderNews(merged);
+        window.scrollTo(0, y);
+      }
+      markNewsUpdated();
     } catch (err) {
       console.error("OKNO news", err);
       if (status) {
@@ -683,11 +705,13 @@
   }
 
   function startNewsPolling() {
+    let n = 0;
     const tick = () => {
       if (document.visibilityState === "hidden") return;
-      loadNews().catch((err) => console.error("news", err));
+      n += 1;
+      loadNews(n % 2 === 0).catch((err) => console.error("news", err));
     };
-    setInterval(tick, 3 * 60 * 1000);
+    setInterval(tick, 45 * 1000);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") tick();
     });
@@ -798,7 +822,10 @@
       if (status && state.visit) {
         status.textContent = T("record.saved", state.totalVisits);
       }
-      if (state.news.length) renderNews(state.news);
+      if (state.news.length) {
+        renderNews(state.news);
+        markNewsUpdated();
+      }
       if (labData) renderLabTable(labData);
     };
   }

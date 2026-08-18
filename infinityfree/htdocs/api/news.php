@@ -12,8 +12,8 @@ header('Cache-Control: no-store, max-age=0');
 header('X-Content-Type-Options: nosniff');
 
 $MIN_ITEMS = 50;
-$STALE_SECONDS = 15 * 60;
-$REMOTE_RETRY_SECONDS = 5 * 60;
+$STALE_SECONDS = 90;
+$REMOTE_RETRY_SECONDS = 45;
 $DATA_DIR = dirname(__FILE__) . '/../data';
 $cacheFile = $DATA_DIR . '/news_cache.json';
 $embeddedFile = $DATA_DIR . '/news_embedded.json';
@@ -406,8 +406,12 @@ if ($shouldPull && $canRetry) {
 
 $items = array();
 if (is_array($data) && !empty($data['items']) && is_array($data['items'])) {
-    $items = $data['items'];
-    if ($mode !== 'GITHUB') {
+    foreach ($data['items'] as $item) {
+        if (!empty($item['title']) && !news_is_garbled($item['title'])) {
+            $items[] = $item;
+        }
+    }
+    if ($mode !== 'GITHUB' && $mode !== 'RSS') {
         $mode = 'STATIC';
     }
 }
