@@ -545,19 +545,33 @@ body > .lang-switch {
 .footer-socials {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.55rem;
 }
-.footer-socials span {
+.social-btn {
   display: inline-flex;
-  min-width: 2.4rem;
-  height: 2rem;
+  width: 2.35rem;
+  height: 2.35rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #514c46;
-  padding: 0 0.65rem;
-  color: #d6cec1;
-  font-size: 0.72rem;
-  font-weight: 700;
+  border-radius: 50%;
+  color: #fff;
+  text-decoration: none;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+.social-btn img {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  filter: brightness(0) invert(1);
+}
+.social-discord { background: #5865f2; }
+.social-vk { background: #0077ff; }
+.social-facebook { background: #1877f2; }
+.social-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
 }
 .footer-nav {
   display: grid;
