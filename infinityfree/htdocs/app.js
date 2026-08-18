@@ -654,19 +654,11 @@
     const status = $("news-status");
     try {
       const bust = Date.now();
-      const refresh = forceRefresh ? "&refresh=1" : "";
-      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + bust;
-      const probes = [
-        fetch("/api/news?t=" + bust + refresh, { cache: "no-store" }).then((res) => {
-          if (!res.ok) throw new Error("Local news cache unavailable");
-          return res.json();
-        }),
-        fetch(cacheUrl, { cache: "no-store" }).then((res) => {
-          if (!res.ok) throw new Error("GitHub cache unavailable");
-          return res.json();
-        }),
-      ];
-      const results = await Promise.allSettled(probes);
+      const refresh = forceRefresh === false ? "" : "&refresh=1";
+      const res = await fetch("/api/news?t=" + bust + refresh, { cache: "no-store" });
+      if (!res.ok) throw new Error("Local news cache unavailable");
+      const payload = await res.json();
+      const results = [{ status: "fulfilled", value: payload }];
       const seen = new Set();
       const merged = [];
       for (const result of results) {
@@ -718,7 +710,7 @@
   }
 
   async function initHome() {
-    loadNews().catch((err) => console.error("news", err));
+    loadNews(true).catch((err) => console.error("news", err));
     startNewsPolling();
     try {
       await loadMeAndClient();

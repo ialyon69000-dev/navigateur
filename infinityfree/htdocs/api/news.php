@@ -377,7 +377,11 @@ $canRetry = $force || ($now - $lastAttempt) >= $REMOTE_RETRY_SECONDS;
 if ($shouldPull && $canRetry) {
     news_write_payload($attemptFile, array('at' => $now));
     $live = news_fetch_rss($FEEDS);
-    if (is_array($live) && count($live['items']) >= 20) {
+    if (is_array($live) && !empty($live['items'])) {
+        $base = ($data && !empty($data['items'])) ? $data['items'] : array();
+        $mergedLive = news_merge($live['items'], $base, max($MIN_ITEMS, count($live['items'])));
+        usort($mergedLive, 'news_sort_by_date');
+        $live['items'] = array_slice($mergedLive, 0, 120);
         news_write_payload($cacheFile, $live);
         $data = $live;
         $mode = 'RSS';
