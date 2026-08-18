@@ -638,11 +638,12 @@
     const status = $("news-status");
     try {
       // Merge every reachable source so the feed never collapses to a few
-      // dispatches: the local InfinityFree endpoint (news.php, which embeds a
-      // 50+ snapshot) and the GitHub-main cache refreshed by Actions.
-      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + Math.floor(Date.now() / 300000);
+      // dispatches: the local InfinityFree endpoint (news.php, which pulls
+      // the GitHub snapshot when stale) and the GitHub-main cache itself.
+      const bust = Math.floor(Date.now() / 180000);
+      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + bust;
       const probes = [
-        fetch("/api/news").then((res) => {
+        fetch("/api/news?t=" + bust, { cache: "no-store" }).then((res) => {
           if (!res.ok) throw new Error("Local news cache unavailable");
           return res.json();
         }),
@@ -677,8 +678,20 @@
     }
   }
 
+  function startNewsPolling() {
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      loadNews().catch((err) => console.error("news", err));
+    };
+    setInterval(tick, 3 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") tick();
+    });
+  }
+
   async function initHome() {
     loadNews().catch((err) => console.error("news", err));
+    startNewsPolling();
     try {
       await loadMeAndClient();
       await recordVisit();

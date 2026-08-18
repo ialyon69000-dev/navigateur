@@ -1,2 +1,5 @@
 node_modules/
 npm-debug.log*
+infinityfree/htdocs/data/news_remote_attempt.json
+data/news_cache.json.tmp
+data/visits.json.tmp

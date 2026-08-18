@@ -637,11 +637,35 @@
   async function loadNews() {
     const status = $("news-status");
     try {
-      const res = await fetch("/api/news");
-      const data = await res.json();
-      const items = (data.items || []).slice();
-      state.news = items;
-      renderNews(items);
+      const bust = Math.floor(Date.now() / 180000);
+      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + bust;
+      const probes = [
+        fetch("/api/news?t=" + bust, { cache: "no-store" }).then((res) => {
+          if (!res.ok) throw new Error("Local news unavailable");
+          return res.json();
+        }),
+        fetch(cacheUrl, { cache: "no-store" }).then((res) => {
+          if (!res.ok) throw new Error("GitHub cache unavailable");
+          return res.json();
+        }),
+      ];
+      const results = await Promise.allSettled(probes);
+      const seen = new Set();
+      const merged = [];
+      for (const result of results) {
+        if (result.status !== "fulfilled" || !result.value) continue;
+        const items = Array.isArray(result.value.items) ? result.value.items : [];
+        for (const item of items) {
+          const key = String(item.title || "").toLowerCase().slice(0, 120);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          merged.push(item);
+        }
+      }
+      merged.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+      if (!merged.length) throw new Error("No news source available");
+      state.news = merged;
+      renderNews(merged);
     } catch (err) {
       console.error("OKNO news", err);
       if (status) {
@@ -651,8 +675,20 @@
     }
   }
 
+  function startNewsPolling() {
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      loadNews().catch((err) => console.error("news", err));
+    };
+    setInterval(tick, 3 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") tick();
+    });
+  }
+
   async function initHome() {
     loadNews().catch((err) => console.error("news", err));
+    startNewsPolling();
     try {
       await loadMeAndClient();
       await recordVisit();

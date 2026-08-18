@@ -77,6 +77,35 @@ function ensureDataFile() {
   if (!fs.existsSync(VISITS_FILE)) fs.writeFileSync(VISITS_FILE, "[]\n", "utf8");
 }
 
+function seedNewsCache() {
+  const candidates = [
+    NEWS_CACHE_FILE,
+    path.join(__dirname, "infinityfree", "htdocs", "data", "news_cache.json"),
+  ];
+  for (const file of candidates) {
+    try {
+      const data = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (data && Array.isArray(data.items) && data.items.length) {
+        newsCache = { at: data.at || 0, items: data.items, errors: data.errors || [] };
+        return;
+      }
+    } catch {
+      /* next candidate */
+    }
+  }
+}
+
+function persistNewsCache() {
+  try {
+    ensureDataFile();
+    const tmp = NEWS_CACHE_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(newsCache) + "\n", "utf8");
+    fs.renameSync(tmp, NEWS_CACHE_FILE);
+  } catch (err) {
+    console.error("news cache write", err.message || err);
+  }
+}
+
 function readVisits() {
   ensureDataFile();
   try {
@@ -315,6 +344,11 @@ async function loadNews(force) {
     seen.add(key);
     unique.push(it);
   }
+  if (!unique.length) {
+    if (newsCache.items.length) return newsCache;
+    seedNewsCache();
+    return newsCache;
+  }
   const balanced = [];
   const leftover = [];
   const perSource = new Map();
@@ -326,6 +360,7 @@ async function loadNews(force) {
     } else leftover.push(it);
   }
   newsCache = { at: now, items: balanced.concat(leftover).slice(0, 120), errors };
+  persistNewsCache();
   return newsCache;
 }
 

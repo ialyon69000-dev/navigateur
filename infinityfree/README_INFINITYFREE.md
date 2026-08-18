@@ -17,7 +17,7 @@ htdocs/
   api/
     _common.php → fonctions partagées (IP, geo ipwho.is, visits)
     me.php → /api/me
-    news.php → /api/news avec cache 5min, gestion win1251→utf8
+    news.php → /api/news (cache disque + snapshot GitHub si périmé)
     visit.php → /api/visit POST
     visits.php → /api/visits GET/DELETE
     health.php
@@ -31,7 +31,7 @@ Le frontend `app.js` reste identique, il appelle `/api/me`, `/api/news`, `/api/v
 
 ### Différences / limitations InfinityFree
 
-1. **Cache** : on ne peut pas garder en mémoire vive. On utilise `data/news_cache.json` fichier avec TTL 5 min.
+1. **Cache** : on ne peut pas garder en mémoire vive. On utilise `data/news_cache.json`, rafraîchi depuis GitHub dès qu’il a plus de 15 minutes.
 2. **Visits** : stockées en JSON comme avant, avec `flock`. Sur InfinityFree le FS est persistant mais peut être vidé. Pour de la prod, remplacer par MySQL.
 3. **IP Geolocation** : identique (ipwho.is) via cURL. Si InfinityFree bloque outbound, ça tombera en `source: unavailable` mais le site reste fonctionnel.
 4. **Security system** : InfinityFree injecte un challenge JS `_test` / `cdn-cgi`. Les fetchs XHR depuis le même domaine passent car le cookie est posé après visite page. Pas de WebSocket [1](https://forum.infinityfree.com/t/can-i-use-websocket-in-my-website-using-node-js/100630).
@@ -46,11 +46,16 @@ Le frontend `app.js` reste identique, il appelle `/api/me`, `/api/news`, `/api/v
 5. Teste : `https://tondomaine/api/health` → `{"ok":true}`
 6. Vérifie ensuite `https://tondomaine/api/news` : la réponse doit être du JSON avec un tableau `items` non vide.
 
-### Correctif de délai RSS
+### Fil qui se met à jour tout seul
 
-`api/news.php` télécharge désormais les sept flux RSS **en parallèle** (maximum huit secondes), au lieu de les attendre l’un après l’autre. C’est important sur InfinityFree : l’ancienne séquence pouvait dépasser la limite d’exécution PHP et produire une réponse vide. Si les sites de presse sont temporairement inaccessibles, le dernier fil non vide est conservé et affiché (`X-Cache: STALE`) plutôt que de vider la page.
+InfinityFree ne peut pas lancer de cron et les flux RSS russes y timeout souvent. Le fil est donc tenu à jour ainsi :
 
-Après avoir mis à jour le site, remplace impérativement `htdocs/api/news.php` sur le serveur. Il n’est pas nécessaire de modifier `.htaccess`. Une première requête à `/api/news` peut prendre jusqu’à huit secondes afin de créer le cache, les suivantes seront servies depuis le cache pendant cinq minutes.
+1. `api/news.php` relit les 7 flux RSS en parallèle (timeout 4 s) dès que le cache a plus de 15 minutes, puis le réécrit sur le disque.
+2. Si les RSS timeout (fréquent sur InfinityFree), il tire le snapshot `main` depuis GitHub.
+3. Le navigateur rappelle `/api/news` toutes les 3 minutes (onglet visible).
+4. Optionnel : dans `.github/workflows/refresh-news-cache.yml`, ajouter `schedule: [{ cron: '*/20 * * * *' }]` pour que Actions tienne aussi le snapshot GitHub à jour.
+
+Après un merge sur `main`, uploader au minimum `htdocs/api/news.php` (et idéalement `htdocs/app.js` + `htdocs/data/news_cache.json`). Le site n’a plus besoin d’un rafraîchissement manuel chaque soir. Il n’est pas nécessaire de modifier `.htaccess`.
 
 ## 3 stratégies possibles
 

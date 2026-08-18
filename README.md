@@ -7,7 +7,7 @@ Projet pédagogique : unes des médias russes + démonstration empreinte navigat
 ### 1. Version Node.js (originale) - `server.js` + `public/`
 - Express + rss-parser + iconv-lite
 - APIs : `/api/me`, `/api/news`, `/api/visit`, `/api/visits`, `/api/health`
-- Stockage `data/visits.json` (MAX 800)
+- Stockage `data/visits.json` (MAX 800) et `data/news_cache.json` (rafraîchi toutes les 5 min)
 - `render.yaml` prêt pour Render.com
 - Mais FS éphémère sur Render free → `visits.json` perdue
 
