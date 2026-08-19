@@ -14,8 +14,141 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, max-age=0');
 header('X-Content-Type-Options: nosniff');
+require_once __DIR__ . '/_common.php';
 
 $MIN_ITEMS = 50;
+$NEWS_TTL_MS = 5 * 60 * 1000;
+
+// --- RSS feed definitions and refresh functions ---
+$FEEDS = [
+  ['id' => 'tass', 'name' => 'TASS', 'url' => 'https://tass.ru/rss/v2.xml', 'color' => '#c8102e'],
+  ['id' => 'ria', 'name' => 'RIA Novosti', 'url' => 'https://ria.ru/export/rss2/index.xml', 'color' => '#e30613'],
+  ['id' => 'lenta', 'name' => 'Lenta.ru', 'url' => 'https://lenta.ru/rss', 'color' => '#ee1c25'],
+  ['id' => 'kommersant', 'name' => 'Коммерсантъ', 'url' => 'https://www.kommersant.ru/RSS/main.xml', 'color' => '#111111'],
+  ['id' => 'izvestia', 'name' => 'Известия', 'url' => 'https://iz.ru/xml/rss/all.xml', 'color' => '#1a3c6e'],
+  ['id' => 'mk', 'name' => 'МК', 'url' => 'https://www.mk.ru/rss/index.xml', 'color' => '#b71c1c'],
+  ['id' => 'gazeta', 'name' => 'Газета.Ru', 'url' => 'https://www.gazeta.ru/export/rss/first.xml', 'color' => '#2c3e50'],
+];
+
+function _strip_html($s) {
+  return trim(preg_replace(['/<!\[CDATA\[([\s\S]*?)\]\]>/', '/<script[\s\S]*?<\/script>/i', '/<style[\s\S]*?<\/style>/i', '/<[^>]+>/', '/\s+/'], ['$1', ' ', ' ', ' ', ' '], $s));
+}
+
+function _decode_entities($s) {
+  return html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+}
+
+function fetch_rss_feed($feed) {
+  try {
+    list($body, $ctype) = httpFetch($feed['url'], 12);
+    $cs = 'utf-8';
+    if (preg_match('/charset=([^\s;]+)/i', (string)$ctype, $m)) {
+      $cs = strtolower(trim($m[1], '"\''));
+    } elseif (preg_match('/encoding=["\']([^"\']+)["\']/i', substr($body, 0, 200), $m)) {
+      $cs = strtolower(trim($m[1], '"\''));
+    }
+    $cp1251 = ['cp1251', 'windows-1251', 'win-1251'];
+    if (in_array($cs, $cp1251)) $cs = 'windows-1251';
+    if ($cs !== 'utf-8') {
+      $body = iconv($cs, 'UTF-8//IGNORE', $body);
+    }
+    $xml = @simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOWARNING | LIBXML_NOERROR);
+    if (!$xml || !$xml->channel) return [];
+    $items = [];
+    $i = 0;
+    foreach ($xml->channel->item as $item) {
+      if ($i >= 24) break; $i++;
+      $title = trim(_strip_html(_decode_entities((string)$item->title)));
+      if (!$title) continue;
+      $link = (string)$item->link ?: '#';
+      $guid = (string)$item->guid ?: $link;
+      $cat = '';
+      if ($item->category) {
+        $cat = trim(_strip_html(_decode_entities((string)$item->category[0])));
+      }
+      $pubDate = (string)$item->pubDate ?: (string)$item->children('dc', true)->date;
+      $iso = null;
+      if ($pubDate) {
+        $ts = strtotime($pubDate);
+        if ($ts) $iso = gmdate('c', $ts);
+      }
+      $desc = trim(_strip_html(_decode_entities((string)$item->description)));
+      $summary = mb_substr($desc, 0, 280);
+      $image = null;
+      if ($item->enclosure && preg_match('/image/i', (string)$item->enclosure['type'] ?: '')) {
+        $image = (string)$item->enclosure['url'];
+      }
+      foreach ($item->children('media', true)->content as $mc) {
+        $url = (string)$mc->attributes()->url;
+        if ($url) { $image = $url; break; }
+      }
+      if (!$image) {
+        foreach ($item->children('media', true)->thumbnail as $mt) {
+          $url = (string)$mt->attributes()->url;
+          if ($url) { $image = $url; break; }
+        }
+      }
+      // Force HTTPS to avoid Mixed Content warnings
+      if ($image && strpos($image, 'http://') === 0) {
+        $image = 'https://' . substr($image, 7);
+      }
+      $items[] = [
+        'id' => $feed['id'] . '-' . $guid,
+        'title' => $title,
+        'link' => $link,
+        'source' => $feed['name'],
+        'sourceId' => $feed['id'],
+        'color' => $feed['color'],
+        'category' => $cat ?: null,
+        'publishedAt' => $iso,
+        'summary' => $summary,
+        'image' => $image,
+      ];
+    }
+    return $items;
+  } catch (Exception $e) {
+    return [];
+  }
+}
+
+function refresh_news_cache($cacheFile, $feeds) {
+  $results = [];
+  foreach ($feeds as $feed) {
+    $results[] = fetch_rss_feed($feed);
+  }
+  $all = [];
+  foreach ($results as $items) {
+    $all = array_merge($all, $items);
+  }
+  if (empty($all)) return false;
+  usort($all, function($a, $b) {
+    $ta = isset($a['publishedAt']) ? strtotime($a['publishedAt']) : 0;
+    $tb = isset($b['publishedAt']) ? strtotime($b['publishedAt']) : 0;
+    return $tb - $ta;
+  });
+  $seen = [];
+  $unique = [];
+  foreach ($all as $it) {
+    $key = mb_strtolower(mb_substr($it['title'] ?? '', 0, 100));
+    if (isset($seen[$key])) continue;
+    $seen[$key] = true;
+    $unique[] = $it;
+  }
+  $balanced = [];
+  $leftover = [];
+  $perSource = [];
+  foreach ($unique as $it) {
+    $sid = $it['sourceId'];
+    $n = $perSource[$sid] ?? 0;
+    if ($n < 12) { $balanced[] = $it; $perSource[$sid] = $n + 1; }
+    else { $leftover[] = $it; }
+  }
+  $final = array_slice(array_merge($balanced, $leftover), 0, 120);
+  $tmp = $cacheFile . '.tmp';
+  file_put_contents($tmp, json_encode(['at' => (int)(microtime(true) * 1000), 'items' => $final, 'errors' => []], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");
+  rename($tmp, $cacheFile);
+  return true;
+}
 
 $EMBEDDED_ITEMS = array(
         array(
@@ -708,6 +841,17 @@ $cacheFile = dirname(__FILE__) . '/../data/news_cache.json';
 $raw = @file_get_contents($cacheFile);
 $data = @json_decode($raw, true);
 
+// Determine if the cache is stale and needs background refresh
+$cacheStale = false;
+if (is_array($data) && !empty($data['at'])) {
+  $cacheAgeMs = (int)(microtime(true) * 1000) - (int)$data['at'];
+  if ($cacheAgeMs > $NEWS_TTL_MS) {
+    $cacheStale = true;
+  }
+} elseif (empty($data) || empty($data['items'])) {
+  $cacheStale = true;
+}
+
 $items = array();
 $mode = 'EMBEDDED';
 if (is_array($data) && !empty($data['items']) && is_array($data['items'])) {
@@ -769,6 +913,21 @@ echo json_encode(array(
     'items' => $items,
     'errors' => isset($data['errors']) && is_array($data['errors']) ? $data['errors'] : array()
 ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+// If cache is stale and we served the cached data, refresh in the background
+// so the next visitor gets the fresh edition
+if ($cacheStale && count($items) >= $MIN_ITEMS) {
+  // Try to close connection early (PHP-FPM) or flush then ignore abort
+  if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+  } else {
+    ignore_user_abort(true);
+    if (ob_get_level()) ob_end_flush();
+    flush();
+  }
+  // Fetch all RSS feeds in the background and save to cache
+  refresh_news_cache($cacheFile, $FEEDS);
+}
 
 function news_sort_by_date($a, $b) {
     $ta = isset($a['publishedAt']) ? $a['publishedAt'] : '';
