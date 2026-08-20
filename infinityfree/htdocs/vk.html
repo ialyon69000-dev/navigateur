@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  PAGE DE SENSIBILISATION AU PHISHING — SIMULATION (VK)
+  ----------------------------------------------------------------------------
+  Cette page imite la page de connexion de VK à des fins de FORMATION et de
+  sensibilisation uniquement (campagne anti-phishing interne).
+
+  IMPORTANT :
+  • Aucune donnée n'est collectée ni transmise : le formulaire n'envoie RIEN
+    (ni identifiant, ni mot de passe). Seul un signal "submit" est envoyé à
+    log.php, qui journalise l'adresse IP + date/heure côté serveur.
+  • Lorsque le participant saisit un identifiant + mot de passe puis clique
+    sur "Se connecter", il est redirigé vers une PAGE D'ATTERRISSAGE
+    pédagogique qui explique qu'il faut vérifier l'URL avant de se connecter
+    et que cette page était un leurre.
+  • En bas de cette page d'atterrissage, un COMPTEUR indique le nombre de
+    personnes piégées : total global de la campagne (si log.php est déployé)
+    ou compteur local par navigateur (repli).
+  • Une mention discrète en pied de page indique qu'il s'agit d'une simulation.
+    (Pour un test "à l'aveugle", vous pouvez la supprimer : cherchez
+     "PAGE FICTIVE" dans le footer et retirez le bloc <span> correspondant.)
+
+  Usage recommandé : uniquement auprès de personnes ayant consenti à
+  l'exercice (vos collaborateurs), jamais contre des tiers.
+  ============================================================================
+-->
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VK — Se connecter</title>
+<style>
+  :root {
+    --vk-blue: #0077ff;
+    --vk-blue-dark: #0066e0;
+    --bg: #ffffff;
+    --field-bg: #f0f2f5;
+    --text: #000000;
+    --text-light: #818c99;
+    --border: #d3d9de;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+  }
+
+  a { color: inherit; }
+
+  .hidden { display: none !important; }
+
+  /* ---------- Page de connexion VK ---------- */
+  .vk-wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+
+  .vk-card {
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+  }
+
+  .vk-logo {
+    font-size: 46px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--vk-blue);
+    margin: 0 0 18px;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .vk-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 16px;
+    color: var(--text);
+  }
+
+  .vk-form { text-align: left; }
+
+  .field {
+    font-size: 15px;
+    padding: 12px 14px;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--field-bg);
+    color: var(--text);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .field:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--vk-blue);
+  }
+
+  .field::placeholder { color: #818c99; }
+
+  .hint {
+    color: #d0021b;
+    font-size: 13px;
+    margin: -2px 0 10px;
+    padding: 0 2px;
+  }
+
+  .btn-signin {
+    background: var(--vk-blue);
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 44px;
+    padding: 0 16px;
+    width: 100%;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 4px;
+  }
+  .btn-signin:hover { background: var(--vk-blue-dark); }
+
+  .qr-link {
+    display: block;
+    text-align: center;
+    margin: 12px 0 16px;
+    font-size: 13px;
+    color: var(--vk-blue);
+    text-decoration: none;
+  }
+  .qr-link:hover { text-decoration: underline; }
+
+  .divider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+    color: var(--text-light);
+    font-size: 12px;
+  }
+  .divider-row::before,
+  .divider-row::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .btn-signup {
+    background: var(--field-bg);
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 44px;
+    padding: 0 16px;
+    width: 100%;
+    color: var(--vk-blue);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-signup:hover { background: #e5e9ee; }
+
+  /* ---------- Pied de page VK ---------- */
+  .vk-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+    font-size: 13px;
+    color: var(--text-light);
+  }
+  .vk-footer a { text-decoration: none; color: var(--text-light); }
+  .vk-footer a:hover { text-decoration: underline; }
+
+  .lang-btn {
+    border: none;
+    background: none;
+    font-size: 13px;
+    color: var(--text-light);
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: underline;
+  }
+
+  .simulation-note {
+    color: #b0b6bd;
+    font-size: 11px;
+  }
+
+  /* ---------- Page d'atterrissage (leurre révélé) ---------- */
+  .landing {
+    min-height: 100vh;
+    background: #f5f7fa;
+    padding: 40px 16px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .landing-inner {
+    max-width: 720px;
+    width: 100%;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 12px 32px rgba(0,0,0,.12);
+    padding: 40px 40px 36px;
+  }
+
+  .landing .emoji { font-size: 48px; margin: 0 0 8px; }
+
+  .landing h1 {
+    font-size: 28px;
+    margin: 0 0 12px;
+    color: #d0021b;
+    line-height: 1.2;
+  }
+
+  .lead {
+    font-size: 17px;
+    line-height: 1.55;
+    color: #1c1e21;
+    margin: 0 0 24px;
+  }
+
+  .golden-rule {
+    background: #e8f3ff;
+    border-left: 4px solid var(--vk-blue);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin: 0 0 24px;
+  }
+  .golden-rule h2 { margin: 0 0 6px; font-size: 18px; color: #1c1e21; }
+  .golden-rule p { margin: 0; font-size: 15px; line-height: 1.5; color: #444950; }
+
+  .url-demo { margin: 0 0 24px; }
+
+  .addr {
+    border-radius: 8px;
+    border: 1px solid;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .addr.bad  { background: #fdecea; border-color: #f5c6cb; }
+  .addr.good { background: #e7f7e4; border-color: #c5e3bf; }
+
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 12px;
+    padding: 2px 10px;
+    margin-bottom: 8px;
+    color: #fff;
+  }
+  .addr.bad .badge  { background: #d64545; }
+  .addr.good .badge { background: #1d8a1d; }
+
+  .addr-bar {
+    font-family: Consolas, Menlo, monospace;
+    font-size: 15px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    word-break: break-all;
+  }
+  .addr p { margin: 0; font-size: 14px; color: #444950; }
+
+  .checks h2 { font-size: 18px; margin: 0 0 8px; color: #1c1e21; }
+  .checks ul { margin: 0 0 24px; padding-left: 20px; }
+  .checks li { font-size: 15px; line-height: 1.7; color: #444950; margin-bottom: 4px; }
+
+  .btn-understood {
+    background: var(--vk-blue);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 46px;
+    padding: 0 24px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-understood:hover { background: var(--vk-blue-dark); }
+
+  /* ---------- Compteur (bas de la page d'atterrissage) ---------- */
+  .counter-box {
+    border-top: 1px solid var(--border);
+    margin-top: 32px;
+    padding-top: 24px;
+    text-align: center;
+  }
+
+  .counter-label {
+    margin: 0 0 4px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-light);
+  }
+
+  .counter-number {
+    font-size: 56px;
+    font-weight: bold;
+    color: var(--vk-blue);
+    margin: 0;
+    line-height: 1;
+  }
+
+  .counter-note {
+    margin: 6px 0 12px;
+    font-size: 14px;
+    color: var(--text-light);
+  }
+
+  .ip-note {
+    margin: 4px 0 12px;
+    font-size: 13px;
+    color: #b3541e;
+  }
+
+  .reset-link {
+    background: none;
+    border: none;
+    color: #a0a6ad;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .reset-link:hover { color: #4b4f56; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 600px) {
+    .landing-inner { padding: 28px 22px; }
+    .counter-number { font-size: 44px; }
+    .vk-footer { position: static; margin-top: 24px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ==================== PAGE DE CONNEXION (leurre) ==================== -->
+  <div class="vk-wrap" id="loginPage">
+
+    <div class="vk-card">
+      <p class="vk-logo">VK</p>
+      <h1 class="vk-title">Connexion</h1>
+
+      <form class="vk-form" id="loginForm" autocomplete="off" novalidate>
+        <input class="field" type="text" name="login" placeholder="Téléphone ou e-mail" aria-label="Téléphone ou e-mail">
+        <input class="field" type="password" name="pass" placeholder="Mot de passe" aria-label="Mot de passe">
+        <p class="hint hidden" id="hint">Veuillez saisir votre identifiant et votre mot de passe.</p>
+        <button class="btn-signin" type="submit">Se connecter</button>
+        <a class="qr-link" href="#">Se connecter avec un code QR</a>
+        <div class="divider-row">ou</div>
+        <button class="btn-signup" type="button">Créer un compte</button>
+      </form>
+    </div>
+
+    <footer class="vk-footer" id="siteFooter">
+      <button class="lang-btn" type="button">Français</button>
+      <a href="#">English</a>
+      <a href="#">Русский</a>
+      <a href="#">À propos</a>
+      <a href="#">Aide</a>
+      <a href="#">Confidentialité</a>
+      <a href="#">Conditions d'utilisation</a>
+      <span>VK &copy; 2026</span>
+
+      <!-- PAGE FICTIVE : mention de simulation (supprimable pour un test à l'aveugle) -->
+      <span class="simulation-note">⚠️ Page fictive créée à des fins de sensibilisation au phishing — aucune donnée n'est collectée ni transmise.</span>
+    </footer>
+
+  </div>
+
+  <!-- ==================== PAGE D'ATTERRISSAGE (leurre révélé) ==================== -->
+  <section class="landing hidden" id="landingPage">
+    <div class="landing-inner">
+
+      <p class="emoji">🎣</p>
+      <h1>Vous avez été piégé&nbsp;! Ceci était un leurre.</h1>
+
+      <p class="lead">
+        Pas de panique&nbsp;: <strong>aucune donnée n'a été transmise</strong>. La page sur
+        laquelle vous venez de saisir vos identifiants <strong>imitait</strong> la page de
+        connexion de VK. Il s'agit d'un exercice de sensibilisation au phishing.
+      </p>
+
+      <div class="golden-rule">
+        <h2>✅ La règle d'or&nbsp;: vérifier l'URL avant de se connecter</h2>
+        <p>
+          Avant de saisir votre identifiant et votre mot de passe, regardez toujours la
+          <strong>barre d'adresse</strong> de votre navigateur. Le nom de domaine doit être
+          exactement <strong>vk.com</strong> (ou <strong>id.vk.com</strong> pour la connexion),
+          sans faute ni extension étrange.
+        </p>
+      </div>
+
+      <div class="url-demo">
+        <div class="addr bad">
+          <span class="badge">❌ Faux</span>
+          <div class="addr-bar">🔒 https://vk-securite.com/login</div>
+          <p>Orthographe inhabituelle, domaine inconnu… c'est un piège.</p>
+        </div>
+        <div class="addr good">
+          <span class="badge">✅ Vrai</span>
+          <div class="addr-bar">🔒 https://vk.com</div>
+          <p>Domaine exact <strong>vk.com</strong>&nbsp;: vous pouvez vous connecter.</p>
+        </div>
+      </div>
+
+      <div class="checks">
+        <h2>Les réflexes à adopter</h2>
+        <ul>
+          <li><strong>L'orthographe du domaine</strong>&nbsp;: méfiez-vous de <em>vkontakte-login.ru</em>, <em>vk-securite.com</em>, <em>vk.secure-login.io</em>…</li>
+          <li><strong>Le cadenas 🔒 ne suffit pas</strong>&nbsp;: un site en https peut être un faux site.</li>
+          <li><strong>Le contexte</strong>&nbsp;: une demande de reconnexion inattendue (e-mail, SMS, message) doit éveiller les soupçons.</li>
+          <li><strong>Tapez l'adresse vous-même</strong> ou passez par vos favoris, plutôt que de cliquer sur un lien reçu.</li>
+        </ul>
+      </div>
+
+      <button class="btn-understood" type="button" onclick="backToLogin()">J'ai compris — revenir à la démo</button>
+
+      <!-- COMPTEUR en bas de la page -->
+      <div class="counter-box">
+        <p class="counter-label">Compteur — personnes piégées sur cette page</p>
+        <p class="counter-number"><span id="counter">0</span></p>
+        <p class="counter-note" id="counterNote">personne(s) ont saisi leurs identifiants sur ce leurre</p>
+        <p class="ip-note hidden" id="ipNote"></p>
+        <button class="reset-link" id="resetLink" type="button" onclick="resetCounter()">Réinitialiser le compteur (formateur)</button>
+      </div>
+
+    </div>
+  </section>
+
+  <script>
+    var STORAGE_KEY = 'vk_phishing_simu_count';
+    var LOG_ENDPOINT = 'log.php';
+    var SOURCE = 'vk';
+    var memoryCount = 0;    // repli si localStorage est indisponible
+    var globalCount = null; // total serveur (chargé si log.php est déployé)
+
+    function readCount() {
+      try {
+        var v = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+        return isNaN(v) ? 0 : v;
+      } catch (e) {
+        return memoryCount;
+      }
+    }
+
+    function saveCount(n) {
+      memoryCount = n;
+      try {
+        localStorage.setItem(STORAGE_KEY, String(n));
+      } catch (e) { /* localStorage bloqué : on garde le compteur en mémoire */ }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    function updateCounterDisplay() {
+      var counterEl = document.getElementById('counter');
+      var noteEl = document.getElementById('counterNote');
+      var resetEl = document.getElementById('resetLink');
+
+      if (globalCount !== null) {
+        counterEl.textContent = String(globalCount);
+        noteEl.textContent = 'personne(s) ont saisi leurs identifiants sur ce leurre (total de la campagne, tous les participants)';
+        resetEl.classList.add('hidden');
+      } else {
+        counterEl.textContent = String(readCount());
+        noteEl.textContent = 'personne(s) ont saisi leurs identifiants sur ce leurre';
+        resetEl.classList.remove('hidden');
+      }
+    }
+
+    function showLanding() {
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('landingPage').classList.remove('hidden');
+      window.scrollTo(0, 0);
+    }
+
+    function backToLogin() {
+      document.getElementById('landingPage').classList.add('hidden');
+      document.getElementById('loginPage').classList.remove('hidden');
+      document.getElementById('loginForm').reset();
+      document.getElementById('hint').classList.add('hidden');
+      window.scrollTo(0, 0);
+    }
+
+    function resetCounter() {
+      saveCount(0);
+      updateCounterDisplay();
+    }
+
+    // Charge le total global depuis log.php (si déployé sur le serveur).
+    function loadGlobalCount() {
+      fetch(LOG_ENDPOINT + '?action=count&source=' + encodeURIComponent(SOURCE))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && typeof d.count === 'number') {
+            globalCount = d.count;
+            updateCounterDisplay();
+          }
+        })
+        .catch(function () { /* log.php non déployé : on garde le compteur local */ });
+    }
+
+    // Journalise la soumission côté serveur (IP + date/heure). JAMAIS le mot de passe.
+    function logSubmit() {
+      fetch(LOG_ENDPOINT, {
+        method: 'POST',
+        body: new URLSearchParams({ event: 'submit', source: SOURCE }),
+        keepalive: true
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && typeof d.count === 'number') {
+            globalCount = d.count;
+            updateCounterDisplay();
+          }
+          if (d && d.ip) {
+            var ipNote = document.getElementById('ipNote');
+            ipNote.textContent = '📍 Votre adresse IP (' + escapeHtml(d.ip) + ') a été enregistrée pour le suivi de la campagne. Aucun mot de passe n\'a été conservé.';
+            ipNote.classList.remove('hidden');
+          }
+        })
+        .catch(function () { /* log.php non déployé : on ignore */ });
+    }
+
+    // Déclenchement de la page d'atterrissage après saisie du login + mot de passe.
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var login = this.elements['login'].value.trim();
+      var pass = this.elements['pass'].value;
+
+      if (!login || !pass) {
+        document.getElementById('hint').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('hint').classList.add('hidden');
+
+      // Journalisation côté serveur (IP + date/heure) + compteur local (repli).
+      logSubmit();
+      saveCount(readCount() + 1);
+      updateCounterDisplay();
+      showLanding();
+    });
+
+    updateCounterDisplay();
+    loadGlobalCount();
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2d7d7a12854aa31',t:'MTc4NzEyODcwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
