@@ -151,6 +151,40 @@ body > .lang-switch {
   background: var(--gold);
 }
 
+.update-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.7rem;
+  margin: 0.7rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.update-timer time {
+  color: var(--crimson);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.update-pulse {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  background: var(--crimson);
+  box-shadow: 0 0 0 0 rgba(158, 27, 27, 0.45);
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(158, 27, 27, 0.4); }
+  50% { opacity: 0.35; box-shadow: 0 0 0 6px rgba(158, 27, 27, 0); }
+}
+
 .mast {
   display: block;
   text-align: center;
@@ -545,19 +579,38 @@ body > .lang-switch {
 .footer-socials {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.55rem;
 }
-.footer-socials span {
+.footer-socials a,
+.footer-socials span,
+.social-icon {
   display: inline-flex;
-  min-width: 2.4rem;
-  height: 2rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
   align-items: center;
   justify-content: center;
   border: 1px solid #514c46;
-  padding: 0 0.65rem;
+  padding: 0;
   color: #d6cec1;
   font-size: 0.72rem;
   font-weight: 700;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.footer-socials a:hover,
+.social-icon:hover {
+  color: #fffaf0;
+  border-color: var(--gold-soft);
+  background: rgba(197, 164, 110, 0.14);
+  transform: translateY(-1px);
+}
+.footer-socials svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: currentColor;
+  display: block;
 }
 .footer-nav {
   display: grid;
@@ -818,6 +871,7 @@ tr:hover td { background: #f0eadc; }
 
 @media (prefers-reduced-motion: reduce) {
   .ticker-track { animation: none; }
+  .update-pulse { animation: none; }
 }
 
 /* ——— Pages statiques : contacts & informations juridiques ——— */
