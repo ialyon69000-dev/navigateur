@@ -289,8 +289,8 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     },
     "legal.contact-title": { ru: "Связь с редакцией", en: "Contacting the editorial office" },
     "legal.contact-text": {
-      ru: "По всем юридическим вопросам пишите на адрес <a href=\"mailto:alexei47@okho.ru\">alexei47@okho.ru</a> — единственный контакт «ОКНО».",
-      en: "For all legal matters, write to <a href=\"mailto:alexei47@okho.ru\">alexei47@okho.ru</a> — ОКНО's only contact.",
+      ru: "По всем юридическим вопросам пишите на адрес <a href=\"mailto:artyomvolkov86@outlook.com\">artyomvolkov86@outlook.com</a> — единственный контакт «ОКНО».",
+      en: "For all legal matters, write to <a href=\"mailto:artyomvolkov86@outlook.com\">artyomvolkov86@outlook.com</a> — ОКНО's only contact.",
     },
     "legal.links": {
       ru: '<a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/contacts.html">Контакты</a>',
