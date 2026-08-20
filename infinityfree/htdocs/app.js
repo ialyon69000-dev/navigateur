@@ -9,25 +9,43 @@
     visit: null,
     news: [],
     totalVisits: 0,
+    lastUpdateAt: null,
   };
 
   function dateLocale() {
     return LANG() === "en" ? "en-GB" : "ru-RU";
   }
 
+  function formatStamp(date, withSeconds) {
+    return new Intl.DateTimeFormat(dateLocale(), {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: withSeconds ? "2-digit" : undefined,
+      timeZone: "Europe/Moscow",
+    }).format(date);
+  }
+
   function renderToday() {
+    const now = new Date();
     const todayEl = $("today");
     if (todayEl) {
-      todayEl.textContent = new Intl.DateTimeFormat(dateLocale(), {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: "Europe/Moscow",
-      }).format(new Date());
+      todayEl.textContent = formatStamp(now, true);
+    }
+    const lastEl = $("last-update");
+    if (lastEl) {
+      const stamp = state.lastUpdateAt ? new Date(state.lastUpdateAt) : now;
+      if (!Number.isNaN(stamp.getTime())) {
+        lastEl.dateTime = stamp.toISOString();
+        lastEl.textContent = formatStamp(stamp, true) + " (MSK)";
+      }
     }
   }
   renderToday();
+  setInterval(renderToday, 1000);
 
   function detectLayoutFromSample(sample) {
     if (!sample) return T("layout.none");
