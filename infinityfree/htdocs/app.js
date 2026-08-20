@@ -672,12 +672,18 @@
       const results = await Promise.allSettled(probes);
       const seen = new Set();
       const merged = [];
+      const isBrokenTitle = (title) => {
+        const s = String(title || "");
+        const cyr = (s.match(/[А-Яа-яЁё]/g) || []).length;
+        const junk = (s.match(/[?\uFFFD]/g) || []).length;
+        return cyr < 2 && junk >= 4;
+      };
       for (const result of results) {
         if (result.status !== "fulfilled" || !result.value) continue;
         const items = Array.isArray(result.value.items) ? result.value.items : [];
         for (const item of items) {
           const key = String(item.title || "").toLowerCase().slice(0, 120);
-          if (!key || seen.has(key)) continue;
+          if (!key || seen.has(key) || isBrokenTitle(item.title)) continue;
           seen.add(key);
           merged.push(item);
         }

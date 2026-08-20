@@ -38,28 +38,73 @@ function _decode_entities($s) {
   return html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
+function _to_utf8($raw, $from) {
+  $from = strtolower((string)$from);
+  if (in_array($from, ['cp1251', 'windows-1251', 'win-1251', 'win1251'], true)) {
+    $from = 'windows-1251';
+  }
+  if ($from === 'utf8') $from = 'utf-8';
+  if ($from === '' || $from === 'utf-8') return $raw;
+  if (function_exists('iconv')) {
+    $out = @iconv($from, 'UTF-8//IGNORE', $raw);
+    if ($out !== false) return $out;
+  }
+  if (function_exists('mb_convert_encoding')) {
+    $out = @mb_convert_encoding($raw, 'UTF-8', $from);
+    if ($out !== false) return $out;
+  }
+  return $raw;
+}
+
+function _looks_broken_cyrillic($s) {
+  $sample = substr((string)$s, 0, 4000);
+  $cyr = preg_match_all('/[\x{0410}-\x{044F}\x{0401}\x{0451}]/u', $sample);
+  $repl = substr_count($sample, '?') + substr_count($sample, "\xEF\xBF\xBD");
+  return $cyr < 10 || $repl > 12;
+}
+
+function _item_title_broken($title) {
+  $t = (string)$title;
+  if ($t === '') return true;
+  $cyr = preg_match_all('/[\x{0410}-\x{044F}\x{0401}\x{0451}]/u', $t);
+  $q = substr_count($t, '?') + substr_count($t, "\xEF\xBF\xBD");
+  return $cyr < 2 && $q >= 4;
+}
+
 function fetch_rss_feed($feed) {
   try {
     list($body, $ctype) = httpFetch($feed['url'], 12);
     $cs = 'utf-8';
-    if (preg_match('/charset=([^\s;]+)/i', (string)$ctype, $m)) {
-      $cs = strtolower(trim($m[1], '"\''));
-    } elseif (preg_match('/encoding=["\']([^"\']+)["\']/i', substr($body, 0, 200), $m)) {
+    if (preg_match('/charset=([^\\s;]+)/i', (string)$ctype, $m)) {
       $cs = strtolower(trim($m[1], '"\''));
     }
-    $cp1251 = ['cp1251', 'windows-1251', 'win-1251'];
-    if (in_array($cs, $cp1251)) $cs = 'windows-1251';
-    if ($cs !== 'utf-8') {
-      $body = iconv($cs, 'UTF-8//IGNORE', $body);
+    if (preg_match('/encoding=["\']([^"\']+)["\']/i', substr($body, 0, 220), $mXml)) {
+      $xmlCs = strtolower(trim($mXml[1], '"\''));
+      // Prefer the XML declaration: Gazeta.Ru often sends charset=utf-8
+      // while the feed bytes and encoding= are windows-1251.
+      if ($feed['id'] === 'gazeta' || $xmlCs !== 'utf-8') $cs = $xmlCs;
+    } elseif ($feed['id'] === 'gazeta') {
+      $cs = 'windows-1251';
     }
-    $xml = @simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOWARNING | LIBXML_NOERROR);
+    $utf = _to_utf8($body, $cs);
+    if (_looks_broken_cyrillic($utf)) {
+      $retry = _to_utf8($body, 'windows-1251');
+      if (!_looks_broken_cyrillic($retry)) $utf = $retry;
+    }
+    // After converting bytes, rewrite encoding so SimpleXML does not
+    // re-decode windows-1251 and turn Cyrillic into "????".
+    $utf = preg_replace('/encoding=["\'][^"\']+["\']/i', 'encoding="UTF-8"', $utf, 1);
+    if (stripos(substr($utf, 0, 80), 'encoding=') === false) {
+      $utf = preg_replace('/<\?xml([^>]*)\?>/i', '<?xml$1 encoding="UTF-8"?>', $utf, 1);
+    }
+    $xml = @simplexml_load_string($utf, 'SimpleXMLElement', LIBXML_NOWARNING | LIBXML_NOERROR);
     if (!$xml || !$xml->channel) return [];
     $items = [];
     $i = 0;
     foreach ($xml->channel->item as $item) {
       if ($i >= 24) break; $i++;
       $title = trim(_strip_html(_decode_entities((string)$item->title)));
-      if (!$title) continue;
+      if (!$title || _item_title_broken($title)) continue;
       $link = (string)$item->link ?: '#';
       $guid = (string)$item->guid ?: $link;
       $cat = '';
@@ -855,8 +900,10 @@ if (is_array($data) && !empty($data['at'])) {
 $items = array();
 $mode = 'EMBEDDED';
 if (is_array($data) && !empty($data['items']) && is_array($data['items'])) {
-    $items = $data['items'];
-    $mode = 'STATIC';
+    foreach ($data['items'] as $it) {
+        if (!empty($it['title']) && !_item_title_broken($it['title'])) $items[] = $it;
+    }
+    if (!empty($items)) $mode = 'STATIC';
 }
 
 if (count($items) < $MIN_ITEMS) {
