@@ -56,6 +56,23 @@ function _to_utf8($raw, $from) {
   return $raw;
 }
 
+// Vrai si les octets forment de l'UTF-8 strict (même si l'en-tête annonce autre
+// chose). Source classique de caractères cassés : un flux UTF-8 déclaré
+// windows-1251 ; dans ce cas l'UTF-8 doit toujours gagner.
+function _is_valid_utf8($raw) {
+  if (function_exists('mb_check_encoding')) {
+    return mb_check_encoding($raw, 'UTF-8');
+  }
+  return (bool)preg_match('//u', $raw);
+}
+
+function _cyrillic_score($s) {
+  $sample = substr((string)$s, 0, 6000);
+  $cyr = preg_match_all('/[\x{0410}-\x{044F}\x{0401}\x{0451}]/u', $sample);
+  $repl = substr_count($sample, "\xEF\xBF\xBD");
+  return $cyr - 5 * $repl;
+}
+
 function _looks_broken_cyrillic($s) {
   $sample = substr((string)$s, 0, 4000);
   $cyr = preg_match_all('/[\x{0410}-\x{044F}\x{0401}\x{0451}]/u', $sample);
@@ -71,26 +88,43 @@ function _item_title_broken($title) {
   return $cyr < 2 && $q >= 4;
 }
 
+// Décode le corps d'un flux en UTF-8 de façon robuste (mêmes règles que server.js) :
+// 1. si les octets sont de l'UTF-8 valide, l'UTF-8 gagne toujours — même si
+//    l'en-tête HTTP ou la déclaration XML annonce autre chose ;
+// 2. sinon on essaie le jeu déclaré puis windows-1251 / koi8-r, et on garde le
+//    décodage avec le plus de lettres cyrilliques et le moins de U+FFFD.
+function _decode_feed_body($body, $ctype, $feedId) {
+  if (_is_valid_utf8($body)) return $body;
+
+  $declared = '';
+  if (preg_match('/charset=([^\\s;]+)/i', (string)$ctype, $m)) {
+    $declared = strtolower(trim($m[1], '"\''));
+  }
+  if (preg_match('/encoding=["\']([^"\']+)["\']/i', substr($body, 0, 220), $mXml)) {
+    $xmlCs = strtolower(trim($mXml[1], '"\''));
+    // Gazeta.Ru envoie parfois charset=utf-8 alors que les octets sont windows-1251.
+    if ($feedId === 'gazeta' || $xmlCs !== 'utf-8') $declared = $xmlCs;
+  } elseif ($feedId === 'gazeta') {
+    $declared = 'windows-1251';
+  }
+
+  $candidates = [];
+  foreach ([$declared, 'windows-1251', 'koi8-r'] as $cs) {
+    if ($cs !== '' && !in_array($cs, $candidates, true)) $candidates[] = $cs;
+  }
+  $best = null; $bestScore = null;
+  foreach ($candidates as $cs) {
+    $text = _to_utf8($body, $cs);
+    $score = _cyrillic_score($text);
+    if ($best === null || $score > $bestScore) { $best = $text; $bestScore = $score; }
+  }
+  return $best !== null ? $best : $body;
+}
+
 function fetch_rss_feed($feed) {
   try {
     list($body, $ctype) = httpFetch($feed['url'], 12);
-    $cs = 'utf-8';
-    if (preg_match('/charset=([^\\s;]+)/i', (string)$ctype, $m)) {
-      $cs = strtolower(trim($m[1], '"\''));
-    }
-    if (preg_match('/encoding=["\']([^"\']+)["\']/i', substr($body, 0, 220), $mXml)) {
-      $xmlCs = strtolower(trim($mXml[1], '"\''));
-      // Prefer the XML declaration: Gazeta.Ru often sends charset=utf-8
-      // while the feed bytes and encoding= are windows-1251.
-      if ($feed['id'] === 'gazeta' || $xmlCs !== 'utf-8') $cs = $xmlCs;
-    } elseif ($feed['id'] === 'gazeta') {
-      $cs = 'windows-1251';
-    }
-    $utf = _to_utf8($body, $cs);
-    if (_looks_broken_cyrillic($utf)) {
-      $retry = _to_utf8($body, 'windows-1251');
-      if (!_looks_broken_cyrillic($retry)) $utf = $retry;
-    }
+    $utf = _decode_feed_body($body, $ctype, $feed['id']);
     // After converting bytes, rewrite encoding so SimpleXML does not
     // re-decode windows-1251 and turn Cyrillic into "????".
     $utf = preg_replace('/encoding=["\'][^"\']+["\']/i', 'encoding="UTF-8"', $utf, 1);

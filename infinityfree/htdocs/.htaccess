@@ -8,6 +8,11 @@ RewriteRule ^api/visit$ api/visit.php [L,QSA]
 RewriteRule ^api/visits$ api/visits.php [L,QSA]
 RewriteRule ^api/visits\.json$ api/visits.php [L,QSA]
 RewriteRule ^api/health$ api/health.php [L,QSA]
+RewriteRule ^api/auth/login$ api/auth/login.php [L,QSA]
+RewriteRule ^api/auth/register$ api/auth/register.php [L,QSA]
+RewriteRule ^api/auth/me$ api/auth/me.php [L,QSA]
+RewriteRule ^api/auth/logout$ api/auth/logout.php [L,QSA]
+RewriteRule ^api/dispatches$ api/dispatches.php [L,QSA]
 
 # Prevent direct access to data
 <FilesMatch "^\.ht">

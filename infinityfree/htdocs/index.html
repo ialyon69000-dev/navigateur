@@ -15,6 +15,11 @@
 <body data-i18n-title="title.home">
   <div class="paper-bg" aria-hidden="true"></div>
 
+  <div class="lang-switch" role="group" aria-label="Language / Язык">
+    <button type="button" class="lang-btn" data-lang-btn="ru" aria-pressed="false"><img src="/images/ru.svg" alt="Русский" /></button>
+    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false"><img src="/images/en.svg" alt="English" /></button>
+  </div>
+
   <header class="site-header">
     <div class="header-rail">
       <span id="today"></span>
@@ -24,11 +29,18 @@
       <span data-i18n="rail.edition">Вечерний выпуск</span>
     </div>
 
-    <p class="update-timer" id="update-timer">
-      <span class="update-pulse" aria-hidden="true"></span>
-      <span data-i18n="rail.updated">Последнее обновление</span>
-      <time id="last-update">—</time>
-    </p>
+    <div class="header-meta">
+      <p class="update-timer" id="update-timer">
+        <span class="update-pulse" aria-hidden="true"></span>
+        <span data-i18n="rail.updated">Последнее обновление</span>
+        <time id="last-update">—</time>
+      </p>
+      <p class="auth-zone" id="auth-zone" aria-live="polite">
+        <a href="/auth/login.html" data-i18n="authzone.login">Войти</a>
+        <span class="rail-dot"></span>
+        <a href="/auth/register.html" data-i18n="authzone.register">Создать логин</a>
+      </p>
+    </div>
 
     <a class="mast" href="/">
       <span class="mast-ornament" aria-hidden="true">✦</span>

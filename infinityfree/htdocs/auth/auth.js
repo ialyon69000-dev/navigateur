@@ -22,7 +22,7 @@
   }
 
   function setSubmitLoading(loading) {
-    const btn = $("SUBMIT_ID");
+    const btn = $(SUBMIT_ID);
     if (!btn) return;
     btn.disabled = !!loading;
     btn.textContent = loading ? T("auth.loading") : T("auth.submit");
