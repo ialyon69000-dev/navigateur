@@ -42,6 +42,14 @@ const parser = new Parser({
   },
 });
 
+const crypto = require("crypto");
+
+function cookieValue(req, name) {
+  const header = req.headers.cookie || "";
+  const m = header.match(new RegExp("(?:^|; )" + JSON.stringify(name).replace(/[{}]/g, "\\$&") + "=([^;]*)"));
+  return m && decodeURIComponent(m[1]) || null;
+}
+
 const app = express();
 app.set("trust proxy", true);
 app.disable("x-powered-by");
@@ -606,11 +614,185 @@ app.get("/api/visits.json", (req, res) => {
   res.type("application/json").send(fs.readFileSync(VISITS_FILE, "utf8"));
 });
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+// ——— Auth ———
+const AUTH_FILE = path.join(DATA_DIR, "users.json");
+const AUTH_COOKIE = "okno-session";
+const AUTH_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
+
+function ensureAuthFile() {
+  if (!fs.existsSync(AUTH_FILE)) {
+    fs.writeFileSync(AUTH_FILE, "[]", "utf8");
+  }
+}
+
+function readUsers() {
+  ensureAuthFile();
+  try {
+    const raw = fs.readFileSync(AUTH_FILE, "utf8");
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeUsers(users) {
+  ensureAuthFile();
+  const tmp = AUTH_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(users, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, AUTH_FILE);
+}
+
+function sha256(str, salt) {
+  return crypto.createHash("sha256").update(str + salt).digest("hex");
+}
+
+function genSessionId() {
+  return "okno-" + crypto.randomBytes(18).toString("hex");
+}
+
+function loadSessionStore() {
+  const key = AUTH_COOKIE + "-store";
+  try {
+    const raw = fs.readFileSync(key, "utf8");
+    const map = JSON.parse(raw);
+    return map && typeof map === "object" ? map : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSessionStore(store) {
+  const key = AUTH_COOKIE + "-store";
+  const tmp = key + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, key);
+}
+
+app.get("/api/auth/me", (req, res) => {
+  const sid = cookieValue(req, AUTH_COOKIE);
+  const store = loadSessionStore();
+  const sess = store[sid];
+  if (!sess || Date.now() - (sess && sess.created || 0) > AUTH_TTL_MS) {
+    return res.json({ ok: false, user: null });
+  }
+  const users = readUsers();
+  const user = users.find((u) => u.id === sess.userId);
+  if (!user) {
+    return res.json({ ok: false, user: null });
+  }
+  res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role } });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const { login, password } = req.body || {};
+  if (!login || !password) {
+    return res.status(400).json({ ok: false, error: "Заполните логин и пароль." });
+  }
+  const users = readUsers();
+  const user = users.find((u) => u.login.toLowerCase() === (login || "").toLowerCase());
+  if (!user) {
+    return res.status(401).json({ ok: false, error: "Неверный логин или пароль." });
+  }
+  const hash = sha256(password, user.salt);
+  if (hash !== user.hash) {
+    return res.status(401).json({ ok: false, error: "Неверный логин или пароль." });
+  }
+  const store = loadSessionStore();
+  const sid = genSessionId();
+  store[sid] = { userId: user.id, created: Date.now() };
+  writeSessionStore(store);
+  res.cookie(AUTH_COOKIE, sid, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: AUTH_TTL_MS / 1000,
+    path: "/",
+  });
+  res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role } });
+});
+
+app.post("/api/auth/register", (req, res) => {
+  const { login, password } = req.body || {};
+  if (!login || !password) {
+    return res.status(400).json({ ok: false, error: "Укажите логин и пароль." });
+  }
+  if ((login || "").length < 3 || (login || "").length > 40) {
+    return res.status(400).json({ ok: false, error: "Логин от 3 до 40 знаков." });
+  }
+  if ((password || "").length < 6) {
+    return res.status(400).json({ ok: false, error: "Пароль от 6 знаков." });
+  }
+  const users = readUsers();
+  if (users.find((u) => u.login.toLowerCase() === login.toLowerCase())) {
+    return res.status(409).json({ ok: false, error: "Этот логин уже занят." });
+  }
+  const salt = login + "-" + Date.now().toString(36);
+  const hash = sha256(password, salt);
+  const newUser = {
+    id: "u_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
+    login,
+    hash,
+    salt,
+    createdAt: new Date().toISOString(),
+    role: "reader",
+  };
+  users.push(newUser);
+  writeUsers(users);
+  res.status(201).json({ ok: true, user: { id: newUser.id, login: newUser.login, role: newUser.role } });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const sid = cookieValue(req, AUTH_COOKIE);
+  if (sid) {
+    const store = loadSessionStore();
+    delete store[sid];
+    writeSessionStore(store);
+  }
+  res.clearCookie(AUTH_COOKIE, { path: "/" });
+  res.json({ ok: true });
+});
+
+// ——— Static dispatches ———
+const DISPATCHES_FILE = path.join(DATA_DIR, "dispatches.json");
+
+function readDispatches() {
+  if (!fs.existsSync(DISPATCHES_FILE)) return [];
+  try {
+    const raw = fs.readFileSync(DISPATCHES_FILE, "utf8");
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+app.get("/api/dispatches", (req, res) => {
+  const dispatches = readDispatches();
+  res.json({ updatedAt: new Date().toISOString(), items: dispatches });
+});
+
+// ——— Protected route: dashboard ———
+app.get("/dashboard.html", (req, res) => {
+  const sid = req.cookies[AUTH_COOKIE];
+  const store = loadSessionStore();
+  const sess = store[sid];
+  if (!sess || Date.now() - sess.created > AUTH_TTL_MS) {
+    res.redirect("/auth/login.html");
+    return;
+  }
+  const users = readUsers();
+  const user = users.find((u) => u.id === sess.userId);
+  if (!user) {
+    res.redirect("/auth/login.html");
+    return;
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(fs.readFileSync(path.join(__dirname, "htdocs", "dashboard.html"), "utf8"));
 });
 
 ensureDataFile();
+ensureAuthFile();
 loadNews(true).catch(() => {});
 
 app.listen(PORT, HOST, () => {

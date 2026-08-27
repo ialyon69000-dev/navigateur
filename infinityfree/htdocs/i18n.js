@@ -309,7 +309,72 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "title.contacts": { ru: "Контакты — ОКНО", en: "Contacts — ОКНО" },
     "title.legal": { ru: "Правовая информация — ОКНО", en: "Legal information — ОКНО" },
     "title.lab": { ru: "Лаборатория — ОКНО", en: "Laboratory — ОКНО" },
-  };
+
+    // auth
+    "title.auth": { ru: "Вход — ОКНО", en: "Sign in — ОКНО" },
+    "title.register": { ru: "Создать логин — ОКНО", en: "Create account — ОКНО" },
+    "title.dashboard": { ru: "Личный кабинет — ОКНО", en: "Dashboard — ОКНО" },
+    "title.dispatches": { ru: "Депеши — ОКНО", en: "Dispatches — ОКНО" },
+
+    // auth: login
+    "auth.title": { ru: "Вход в редакцию", en: "Sign in to the editorial office" },
+    "auth.subtitle": { ru: "Введите логин и пароль для доступа к депешам.", en: "Enter your login and password to access dispatches." },
+    "auth.login-label": { ru: "Логин", en: "Login" },
+    "auth.password-label": { ru: "Пароль", en: "Password" },
+    "auth.submit": { ru: "Войти", en: "Sign in" },
+    "auth.or": { ru: " · ", en: " · " },
+    "auth.back-home": { ru: "На главную", en: "Back to home" },
+    "auth.register-link": { ru: "Создать логин", en: "Create an account" },
+    "auth.login-link": { ru: "Войти", en: "Sign in" },
+    "auth.empty-fields": { ru: "Заполните логин и пароль.", en: "Fill in the login and password." },
+    "auth.server-error": { ru: "Ошибка сервера. Попробуйте позже.", en: "Server error. Try again later." },
+    "auth.success": { ru: "Добро пожаловать. Перенаправляем…", en: "Welcome. Redirecting…" },
+    "auth.password-mismatch": { ru: "Пароли не совпадают.", en: "Passwords do not match." },
+    "auth.password-short": { ru: "Пароль от 6 знаков.", en: "Password must be at least 6 characters." },
+    "auth.login-short": { ru: "Логин от 3 знаков.", en: "Login must be at least 3 characters." },
+    "auth.loading": { ru: "Загрузка…", en: "Loading…" },
+
+    // register
+    "register.title": { ru: "Создать логин", en: "Create an account" },
+    "register.subtitle": { ru: "Укажите логин и пароль. Письма отправлять не нужно — всё на сервере.", en: "Enter a login and password. No email needed — everything stays on the server." },
+    "register.login-label": { ru: "Логин", en: "Login" },
+    "register.password-label": { ru: "Пароль", en: "Password" },
+    "register.password2-label": { ru: "Повторите пароль", en: "Repeat password" },
+    "register.submit": { ru: "Создать", en: "Create" },
+    "register.success": { ru: "Аккаунт создан. Теперь войдите.", en: "Account created. Please sign in now." },
+    "register.or": { ru: " · ", en: " · " },
+
+    // dashboard
+    "dash.title": { ru: "Личный кабинет", en: "Dashboard" },
+    "dash.user": { ru: "Пользователь:", en: "User:" },
+    "dash.stats": { ru: "Статистика редакции", en: "Editorial statistics" },
+    "dash.stat-dispatches": { ru: "Депеши", en: "Dispatches" },
+    "dash.stat-dispatches-note": { ru: "В архиве личной рассылки", en: "In the personal mailing archive" },
+    "dash.stat-role": { ru: "Роль", en: "Role" },
+    "dash.stat-role-note": { ru: "Права доступа", en: "Access rights" },
+    "dash.dispatches-title": { ru: "Депеши", en: "Dispatches" },
+    "dash.updated": { ru: "Обновлено:", en: "Updated:" },
+    "dash.items": { ru: " — ", en: " — " },
+    "dash.items-total": { ru: " заявок", en: " items" },
+    "dash.th-cat": { ru: "Раздел", en: "Section" },
+    "dash.th-source": { ru: "Источник", en: "Source" },
+    "dash.th-title": { ru: "Заголовок", en: "Headline" },
+    "dash.th-time": { ru: "Время (МСК)", en: "Time (MSK)" },
+    "dash.no-dispatches": { ru: "Нет депеш в архиве.", en: "No dispatches in the archive." },
+    "dash.logout": { ru: "Выйти", en: "Sign out" },
+    "dash.role-reader": { ru: "Читатель", en: "Reader" },
+    "dash.role-editor": { ru: "Редактор", en: "Editor" },
+    "disp.no-dispatches": { ru: "Депешей пока нет.", en: "No dispatches yet." },
+    "disp.error": { ru: "Не удалось загрузить депеши.", en: "Could not load dispatches." },
+    "disp.login": { ru: "Войти", en: "Sign in" },
+    "disp.guest": { ru: "Гость", en: "Guest" },
+    "disp.visitor-label": { ru: "Пользователь:", en: "User:" },
+    "disp.title": { ru: "Депеши", en: "Dispatches" },
+    "disp.no-dispatches-alt": { ru: "Депешей пока нет.", en: "No dispatches yet." },
+
+    // rail (reused for pages without ticker)
+    "rail.edition": { ru: "Вечерний выпуск", en: "Evening edition" },
+    "rail.seven": { ru: "Семь редакций", en: "Seven newsrooms" },
 
   let current = DEFAULT;
 

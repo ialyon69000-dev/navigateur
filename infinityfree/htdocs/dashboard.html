@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n-title="title.dashboard">Личный кабинет — ОКНО</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .dash-wrap {
+      max-width: 960px;
+      margin: 2.5rem auto 0;
+      padding: 0 1.4rem 3rem;
+    }
+    .dash-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 2px solid var(--crimson);
+      padding-bottom: 0.8rem;
+      margin-bottom: 1.8rem;
+    }
+    .dash-title {
+      font-family: var(--serif);
+      font-size: 2.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .dash-user {
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      color: var(--gold-soft);
+      letter-spacing: 0.04em;
+      background: rgba(176,137,62,0.08);
+      border: 1px solid var(--gold);
+      padding: 0.4em 0.9em;
+      border-radius: 20px;
+    }
+    .dash-user span {
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .dash-section {
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      padding: 1.4rem 1.4rem 1.2rem;
+      margin-bottom: 1.4rem;
+    }
+    .dash-section h3 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 1.25rem;
+      margin: 0 0 0.9rem;
+      color: var(--ink);
+      padding-bottom: 0.45rem;
+      border-bottom: 1px solid var(--rule);
+    }
+    .dash-meta {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--mute);
+      letter-spacing: 0.04em;
+      margin: 0 0 0.9rem;
+    }
+    .dash-meta strong {
+      color: var(--ink-2);
+    }
+    .dash-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+    }
+    .stat-card {
+      border: 1px solid var(--rule);
+      background: #fff;
+      padding: 0.9rem 1rem;
+    }
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--mute);
+      margin: 0 0 0.3rem;
+    }
+    .stat-value {
+      font-family: var(--serif);
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1;
+      margin: 0 0 0.25rem;
+    }
+    .stat-note {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--mute);
+    }
+    .stat-card.crimson {
+      border-left: 3px solid var(--crimson);
+    }
+    .stat-card.gold {
+      border-left: 3px solid var(--gold);
+    }
+    .disp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .disp-table th {
+      text-align: left;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid var(--rule);
+      color: var(--mute);
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.66rem;
+      background: #f4efe4;
+    }
+    .disp-table td {
+      padding: 0.55rem 0.6rem;
+      border-bottom: 1px solid var(--rule);
+      vertical-align: top;
+      color: var(--ink-2);
+      line-height: 1.35;
+    }
+    .disp-table td.source {
+      font-weight: 500;
+      color: var(--crimson-deep);
+      white-space: nowrap;
+    }
+    .disp-table td.cat {
+      color: var(--gold-soft);
+      white-space: nowrap;
+    }
+    .disp-table tr:last-child td {
+      border-bottom: none;
+    }
+    .dash-empty {
+      color: var(--mute);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      margin: 1rem 0 0;
+    }
+    .dash-footer {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--crimson);
+      background: transparent;
+      color: var(--crimson);
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 0.86rem;
+      padding: 0.55rem 1rem;
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: background 0.12s, color 0.12s;
+      border-radius: 3px;
+    }
+    .btn:hover {
+      background: var(--crimson);
+      color: var(--ivory);
+    }
+    .btn i {
+      font-style: normal;
+      color: var(--gold-soft);
+      margin-right: 0.25rem;
+    }
+  </style>
+</head>
+<body data-i18n-title="title.dashboard">
+  <div class="paper-bg" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="mast" href="/">
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+      <h1 class="mast-title">ОКНО</h1>
+      <p class="mast-line" data-i18n="mast.tagline">Обозрение · Москва, Петербург, мир</p>
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+    </a>
+  </header>
+
+  <main class="dash-wrap">
+    <div class="dash-header">
+      <h2 class="dash-title" data-i18n="dash.title">Личный кабинет</h2>
+      <div class="dash-user" id="dash-user">
+        <span data-i18n="dash.user">Пользователь:</span> <strong id="dash-login">—</strong>
+      </div>
+    </div>
+
+    <section class="dash-section" aria-labelledby="stats-title">
+      <h3 id="stats-title" data-i18n="dash.stats">Статистика редакции</h3>
+      <div class="dash-meta">
+        <strong>ID:</strong> <span id="dash-id">—</span> ·
+        <strong>Создан:</strong> <span id="dash-created">—</span>
+      </div>
+      <div class="dash-grid">
+        <div class="stat-card crimson">
+          <p class="stat-label" data-i18n="dash.stat-dispatches">Депеши</p>
+          <p class="stat-value" id="stat-dispatches">0</p>
+          <p class="stat-note" data-i18n="dash.stat-dispatches-note">В архиве личной рассылки</p>
+        </div>
+        <div class="stat-card gold">
+          <p class="stat-label" data-i18n="dash.stat-role">Роль</p>
+          <p class="stat-value" id="stat-role">—</p>
+          <p class="stat-note" data-i18n="dash.stat-role-note">Права доступа</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="dash-section" aria-labelledby="disp-title">
+      <h3 id="disp-title" data-i18n="dash.dispatches-title">Депеши</h3>
+      <div class="dash-meta">
+        <span data-i18n="dash.updated">Обновлено:</span>
+        <time id="disp-updated">—</time>
+        <span data-i18n="dash.items"> — </span>
+        <span id="disp-count">0</span>
+        <span data-i18n="dash.items-total"> заявок</span>
+      </div>
+      <table class="disp-table">
+        <thead>
+          <tr>
+            <th data-i18n="dash.th-cat">Раздел</th>
+            <th data-i18n="dash.th-source">Источник</th>
+            <th data-i18n="dash.th-title">Заголовок</th>
+            <th data-i18n="dash.th-time">Время (МСК)</th>
+          </tr>
+        </thead>
+        <tbody id="disp-body"></tbody>
+      </table>
+      <p class="dash-empty" id="disp-empty">Нет депешей в архиве.</p>
+    </section>
+
+    <div class="dash-footer">
+      <a class="btn" id="dash-logout" href="/auth/login.html"><i>✦</i> <span data-i18n="dash.logout">Выйти</span></a>
+    </div>
+  </main>
+
+  <footer class="media-footer">
+    <div class="footer-inner">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <a class="footer-logo" href="/" data-i18n="footer.home" data-i18n-attr="aria-label" data-i18n-attr-key="footer.home">ОКНО</a>
+          <p data-i18n="footer.tagline">Общественно-политическое обозрение</p>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <div>
+          <p>© 2026 «ОКНО». Все права защищены.</p>
+          <p>Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
+        </div>
+        <strong class="age-mark" aria-label="Для лиц старше восемнадцати лет">18+</strong>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/i18n.js"></script>
+  <script src="/dashboard.js"></script>
+</body>
+</html>
