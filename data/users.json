@@ -1,0 +1,10 @@
+[
+  {
+    "id": "admin",
+    "login": "okno",
+    "hash": "e8c087e2021084b171a252308d2b2f6435847f084e20255bc0e0c55cd6f7155d",
+    "salt": "okno-2026",
+    "createdAt": "2026-08-27T00:00:00Z",
+    "role": "editor"
+  }
+]

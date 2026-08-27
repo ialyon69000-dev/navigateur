@@ -1,78 +1,93 @@
 # Portage InfinityFree — OKNO
 
 ## Réponse rapide
-**Non, le projet Node.js actuel ne peut PAS tourner tel quel sur InfinityFree gratuit.**
+**Le projet Node.js ne peut PAS tourner tel quel sur InfinityFree gratuit.**
+InfinityFree gratuit = Apache + PHP uniquement, pas de Node.js. D'où ce
+portage 100% PHP dans `infinityfree/htdocs/`.
 
-- InfinityFree gratuit = Apache + PHP + MySQL uniquement, pas de Node.js, pas de `npm install`, pas de `node server.js` [5](https://stackoverflow.com/questions/68023391/how-to-host-a-node-js-web-server-that-can-handle-requests-in-port-with-github-pa)
-- Le forum officiel confirme : "InfinityFree does not support Node.js" / "You can't install Node.js on web hosting" [3](https://forum.infinityfree.com/t/does-node-js-support-socket-io/106975) [4](https://forum.infinityfree.com/t/to-this-q-can-i-install-node-js/93083/6)
-- Seule l'offre Premium (iFastNet) propose "Python/Ruby/Node.js Support" via cPanel [2](https://www.infinityfree.com/premium/)
-
-## Ce que j'ai préparé pour toi
-Dans `infinityfree/htdocs/` tu as une version 100% PHP prête à uploader :
+## Contenu de `infinityfree/htdocs/` (à mettre dans `htdocs/` du serveur)
 
 ```
-htdocs/
-  index.html, styles.css, app.js (originaux)
-  .htaccess → rewrite /api/* vers api/*.php
-  api/
-    _common.php → fonctions partagées (IP, geo ipwho.is, visits)
-    me.php → /api/me
-    news.php → /api/news avec cache 5min, gestion win1251→utf8
-    visit.php → /api/visit POST
-    visits.php → /api/visits GET/DELETE
-    health.php
-  data/
-    visits.json (doit être writable 666)
-    news_cache.json
-    .htaccess → deny all
+index.html, styles.css, app.js, i18n.js        frontend (drapeaux RU/EN, zone connexion)
+confidentialite.html, contacts.html,
+informations-juridiques.html, laboratoire.html pages statiques
+auth/login.html, auth/register.html,
+auth/dispatches.html, auth/auth.js             connexion / inscription / dépêches
+dashboard.html, dashboard.js                   tableau de bord (protégé par session)
+dispatches.js                                  liste des dépêches
+vk.html, log.php                               exercice de sensibilisation au phishing
+images/ru.svg, images/en.svg                   drapeaux du sélecteur de langue
+.htaccess                                      réécritures /api/* + en-têtes sécurité
+api/
+  _common.php          fonctions partagées (IP, geo ipwho.is, visits avec flock)
+  me.php               GET  /api/me
+  news.php             GET  /api/news — cache 5 min, décodage robuste
+                       (UTF-8 toujours gagnant si valide, sinon windows-1251/koi8-r)
+  visit.php            POST /api/visit
+  visits.php           GET/DELETE /api/visits
+  health.php           GET  /api/health
+  dispatches.php       GET  /api/dispatches
+  auth/
+    _auth.php          logique commune (cookie okno-session, sha256+sel, sessions)
+    login.php          POST /api/auth/login
+    register.php       POST /api/auth/register
+    me.php             GET  /api/auth/me
+    logout.php         POST /api/auth/logout
+data/
+  users.json           comptes (seed : éditeur « okno »)
+  sessions.json        sessions actives
+  visits.json          journal des visites
+  dispatches.json      dépêches du tableau de bord
+  news_cache.json      dernier instantané propre des flux (UTF-8)
+  .htaccess            interdit l'accès direct au dossier
 ```
-
-Le frontend `app.js` reste identique, il appelle `/api/me`, `/api/news`, `/api/visit` comme avant.
 
 ### Différences / limitations InfinityFree
+1. **Cache** : pas de mémoire vive → `data/news_cache.json` avec TTL 5 min.
+2. **Visites / comptes / sessions** : JSON sur disque avec `flock` (persistant).
+3. **Géo IP** : ipwho.is via cURL ; si bloqué, `source: unavailable`, le site marche.
+4. **Système de sécurité** : InfinityFree peut injecter un challenge JS sur les
+   premières visites ; les fetch XHR même domaine passent ensuite.
+5. **Limites** : 50k hits/jour, ~10% CPU, pas de cron. Le premier `/api/news`
+   peut prendre ~8 s (téléchargement parallèle des 7 flux), puis cache 5 min.
 
-1. **Cache** : on ne peut pas garder en mémoire vive. On utilise `data/news_cache.json` fichier avec TTL 5 min.
-2. **Visits** : stockées en JSON comme avant, avec `flock`. Sur InfinityFree le FS est persistant mais peut être vidé. Pour de la prod, remplacer par MySQL.
-3. **IP Geolocation** : identique (ipwho.is) via cURL. Si InfinityFree bloque outbound, ça tombera en `source: unavailable` mais le site reste fonctionnel.
-4. **Security system** : InfinityFree injecte un challenge JS `_test` / `cdn-cgi`. Les fetchs XHR depuis le même domaine passent car le cookie est posé après visite page. Pas de WebSocket [1](https://forum.infinityfree.com/t/can-i-use-websocket-in-my-website-using-node-js/100630).
-5. **Limites** : 50k hits/jour, 10% CPU, pas de cron. Le chargement initial des 7 RSS peut être un peu lent (12s timeout).
+## Déploiement — tout d'un coup via GitHub Actions (recommandé)
 
-## Déploiement
+Le workflow `.github/workflows/deploy-infinityfree.yml` envoie tout le dossier
+`infinityfree/htdocs/` vers `/htdocs/` par FTP.
 
-1. Crée compte InfinityFree → domaine → File Manager ou FTP
-2. Upload le contenu de `infinityfree/htdocs/` dans `htdocs/` sur le serveur (pas le dossier lui-même)
-3. Dans cPanel InfinityFree, chmod 666 sur `htdocs/data/visits.json` et `news_cache.json` (ou 777 sur dossier `data` si bloqué)
-4. PHP version 8.1 ou 8.2 recommandée
-5. Teste : `https://tondomaine/api/health` → `{"ok":true}`
-6. Vérifie ensuite `https://tondomaine/api/news` : la réponse doit être du JSON avec un tableau `items` non vide.
+1. **Secrets** : GitHub → Settings → Secrets and variables → Actions :
+   - `FTP_SERVER` = `ftpupload.net` (ou le serveur indiqué par InfinityFree)
+   - `FTP_USERNAME` = identifiant du compte FTP (ex. `if0_12345678`)
+   - `FTP_PASSWORD` = mot de passe FTP
+2. **Première installation** : onglet Actions → « Deploy PHP to InfinityFree »
+   → Run workflow → **cocher `include_data`** (envoie aussi `data/`).
+3. **Ensuite** : chaque push sur `main` qui modifie `infinityfree/htdocs/`
+   redéploie le code automatiquement, **sans écraser `data/`** du serveur
+   (visites, comptes, sessions et cache accumulés sont préservés).
+4. Droits : dans le File Manager InfinityFree, chmod **777** sur `data/` et
+   **666** sur les fichiers `data/*.json` (nécessaire pour l'écriture).
+5. Tests : `https://tondomaine/api/health` → `{"ok":true}`, puis
+   `https://tondomaine/api/news` → JSON avec `items` non vide.
 
-### Correctif de délai RSS
+## Déploiement manuel (FileZilla ou File Manager)
 
-`api/news.php` télécharge désormais les sept flux RSS **en parallèle** (maximum huit secondes), au lieu de les attendre l’un après l’autre. C’est important sur InfinityFree : l’ancienne séquence pouvait dépasser la limite d’exécution PHP et produire une réponse vide. Si les sites de presse sont temporairement inaccessibles, le dernier fil non vide est conservé et affiché (`X-Cache: STALE`) plutôt que de vider la page.
+1. Upload du **contenu** de `infinityfree/htdocs/` dans `htdocs/` (pas le dossier).
+2. chmod 777 `data/`, 666 `data/*.json`.
+3. PHP 8.1/8.2 recommandé.
+4. Test `/api/health`.
 
-Après avoir mis à jour le site, remplace impérativement `htdocs/api/news.php` sur le serveur. Il n’est pas nécessaire de modifier `.htaccess`. Une première requête à `/api/news` peut prendre jusqu’à huit secondes afin de créer le cache, les suivantes seront servies depuis le cache pendant cinq minutes.
+## Rafraîchir le cache de nouvelles sans attendre
 
-## 3 stratégies possibles
+Workflow « Refresh OKNO news cache » (`workflow_dispatch`) : régénère
+`infinityfree/htdocs/data/news_cache.json` depuis les 7 flux RSS avec le même
+décodage robuste, et le committe sur la branche. Sur InfinityFree, le cache se
+régénère aussi tout seul toutes les 5 min en arrière-plan.
 
-### A. Full PHP (ce que je viens de faire)
-- Avantages : gratuit, tout sur InfinityFree
-- Inconvénients : un peu moins performant que Node, parsing XML en PHP
+## Test en local
 
-### B. Hybride : Frontend InfinityFree + Backend Render
-- Garde ton `server.js` actuel sur Render (tu as déjà `render.yaml`)
-- Sur InfinityFree, `htdocs/` = seulement statique, et `app.js` appelle `https://ton-app.onrender.com/api/news` avec CORS enabled
-- Avantages : pas besoin de réécrire
-- Inconvénients : 2 hébergements, CORS, latence
-
-### C. InfinityFree Premium / iFastNet
-- Il supporte Node.js via cPanel. Tu peux alors pusher `server.js` en mode Node App.
-- Coût ~$3.99/mois mais garde code actuel [2](https://www.infinityfree.com/premium/)
-
-## Si tu veux que je finalise
-
-Dis-moi quelle stratégie tu préfères :
-- Je peux pousser la version PHP (ajuster `app.js` pour debug, MySQL au lieu de JSON)
-- Ou ajouter config CORS pour mode hybride
-- Ou créer un `Dockerfile` pour iFastNet Node
-
-Actuellement `infinityfree/htdocs/` est fonctionnel en local avec `php -S localhost:8000 -t htdocs` → teste-le avec `php -S`.
+```bash
+cd infinityfree/htdocs
+php -S localhost:8000
+# http://localhost:8000/api/health
+```

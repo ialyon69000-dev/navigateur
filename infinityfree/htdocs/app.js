@@ -701,8 +701,48 @@
     }
   }
 
+  // ——— Zone de connexion (en-tête) ———
+  async function renderAuthZone() {
+    const zone = $("auth-zone");
+    if (!zone) return;
+    const sep = '<span class="rail-dot"></span>';
+    let user = null;
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json().catch(() => ({}));
+      if (data && data.ok && data.user) user = data.user;
+    } catch {
+      user = null;
+    }
+    if (user) {
+      const esc = (s) =>
+        String(s || "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+      zone.innerHTML =
+        `<span class="auth-user">${T("authzone.user", esc(user.login))}</span>` +
+        sep +
+        `<a href="/dashboard.html" data-i18n="authzone.dashboard">${T("authzone.dashboard")}</a>` +
+        sep +
+        `<button type="button" class="auth-link" id="authzone-logout">${T("authzone.logout")}</button>`;
+      const btn = $("authzone-logout");
+      if (btn) {
+        btn.addEventListener("click", async () => {
+          try {
+            await fetch("/api/auth/logout", { method: "POST" });
+          } catch {}
+          renderAuthZone();
+        });
+      }
+    } else {
+      zone.innerHTML =
+        `<a href="/auth/login.html">${T("authzone.login")}</a>` +
+        sep +
+        `<a href="/auth/register.html">${T("authzone.register")}</a>`;
+    }
+  }
+
   async function initHome() {
     loadNews().catch((err) => console.error("news", err));
+    renderAuthZone().catch((err) => console.error("auth-zone", err));
     try {
       await loadMeAndClient();
       await recordVisit();
@@ -807,6 +847,7 @@
       }
       if (state.news.length) renderNews(state.news);
       if (labData) renderLabTable(labData);
+      if ($("auth-zone")) renderAuthZone();
     };
   }
 

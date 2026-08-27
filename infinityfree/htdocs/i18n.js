@@ -376,6 +376,14 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "rail.edition": { ru: "Вечерний выпуск", en: "Evening edition" },
     "rail.seven": { ru: "Семь редакций", en: "Seven newsrooms" },
 
+    // zone de connexion sur la page d'accueil
+    "authzone.login": { ru: "Войти", en: "Sign in" },
+    "authzone.register": { ru: "Создать логин", en: "Create an account" },
+    "authzone.dashboard": { ru: "Личный кабинет", en: "Dashboard" },
+    "authzone.logout": { ru: "Выйти", en: "Sign out" },
+    "authzone.user": { ru: (login) => `Пользователь: ${login}`, en: (login) => `User: ${login}` },
+  };
+
   let current = DEFAULT;
 
   function detect() {
@@ -443,8 +451,25 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     applyAll();
   }
 
+function bindExistingSwitcher(wrap) {
+  wrap.querySelectorAll("[data-lang-btn]").forEach((b) => {
+    const lang = b.dataset.langBtn;
+    if (!SUPPORTED.includes(lang)) return;
+    b.addEventListener("click", () => setLanguage(lang));
+    const labelKey = lang === "ru" ? "lang.switch-ru" : "lang.switch-en";
+    b.setAttribute("aria-label", t(labelKey));
+    b.setAttribute("title", t(labelKey));
+    const img = b.querySelector("img");
+    if (img) img.alt = t(labelKey);
+  });
+}
+
 function buildSwitcher() {
-  if (document.querySelector(".lang-switch")) return;
+  const existing = document.querySelector(".lang-switch");
+  if (existing) {
+    bindExistingSwitcher(existing);
+    return;
+  }
 
   const wrap = document.createElement("div");
   wrap.className = "lang-switch";
