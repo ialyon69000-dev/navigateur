@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n-title="title.auth">Редакция — ОКНО</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .auth-wrap {
+      max-width: 460px;
+      margin: 3rem auto 0;
+      padding: 0 1.4rem;
+    }
+    .auth-card {
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      padding: 1.7rem 1.5rem 1.5rem;
+      border-top: 3px double var(--rule-strong);
+    }
+    .auth-card h2 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 1.7rem;
+      margin: 0 0 0.3rem;
+      letter-spacing: -0.01em;
+    }
+    .auth-card .sub {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--mute);
+      letter-spacing: 0.04em;
+      margin: 0 0 1.4rem;
+    }
+    .auth-form label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--mute);
+      margin: 0 0 0.35rem;
+    }
+    .auth-form input {
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--rule-strong);
+      background: #fff;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 3px;
+      margin-bottom: 1.1rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .auth-form input:focus {
+      outline: none;
+      border-color: var(--crimson);
+      background: #fdfaf3;
+    }
+    .auth-form input::placeholder {
+      color: var(--mute);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+    }
+    .auth-error {
+      border-left: 3px solid var(--crimson);
+      background: rgba(158,27,27,0.05);
+      color: var(--crimson-deep);
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      padding: 0.6rem 0.9rem;
+      margin-bottom: 1rem;
+      display: none;
+      line-height: 1.4;
+    }
+    .auth-error.show {
+      display: block;
+    }
+    .auth-submit {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: var(--ivory);
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 0.92rem;
+      padding: 0.75rem 1.1rem;
+      width: 100%;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: opacity 0.12s, background 0.12s;
+      border-radius: 3px;
+    }
+    .auth-submit:hover {
+      opacity: 0.85;
+      background: var(--crimson);
+      border-color: var(--crimson);
+    }
+    .auth-submit:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .auth-foot {
+      margin-top: 1.2rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      color: var(--mute);
+      text-align: center;
+    }
+    .auth-foot a {
+      color: var(--crimson);
+      text-decoration: none;
+      border-bottom: 1px solid var(--crimson);
+      padding-bottom: 0.05rem;
+    }
+    .auth-foot a:hover {
+      color: var(--crimson-deep);
+      border-bottom-color: var(--crimson-deep);
+    }
+    .auth-switch {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--rule);
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--mute);
+      text-align: center;
+      line-height: 1.7;
+    }
+    .auth-switch a {
+      color: var(--ink-2);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      padding-bottom: 0.05rem;
+    }
+    .auth-switch a:hover {
+      border-bottom-color: var(--ink-2);
+    }
+  </style>
+</head>
+<body data-i18n-title="title.auth">
+  <div class="paper-bg" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="mast" href="/">
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+      <h1 class="mast-title">ОКНО</h1>
+      <p class="mast-line" data-i18n="mast.tagline">Обозрение · Москва, Петербург, мир</p>
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+    </a>
+    <p class="update-timer">
+      <span class="update-pulse" aria-hidden="true"></span>
+      <span data-i18n="rail.edition">Редакция</span>
+      <span class="rail-dot"></span>
+      <time id="auth-time">—</time>
+    </p>
+  </header>
+
+  <main class="auth-wrap">
+    <div class="auth-card" role="region" aria-labelledby="auth-title">
+      <h2 id="auth-title" data-i18n="auth.title">Вход в редакцию</h2>
+      <p class="sub" data-i18n="auth.subtitle">Введите логин и пароль для доступа к депешам.</p>
+
+      <div class="auth-error" id="auth-error" role="alert"></div>
+
+      <form class="auth-form" id="auth-form" novalidate>
+        <label for="login" data-i18n="auth.login-label">Логин</label>
+        <input id="login" name="login" type="text" autocomplete="username" placeholder="okno" required />
+
+        <label for="password" data-i18n="auth.password-label">Пароль</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="******" required minlength="6" />
+
+        <button class="auth-submit" id="auth-submit" type="submit" data-i18n="auth.submit">Войти</button>
+      </form>
+
+      <div class="auth-switch">
+        <span>Нет аккаунта?</span>
+        <a href="/auth/register.html" data-i18n="auth.register-link">Создать логин</a>
+        <span data-i18n="auth.or"> · </span>
+        <a href="/" data-i18n="auth.back-home">На главную</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="media-footer">
+    <div class="footer-inner">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <a class="footer-logo" href="/" data-i18n="footer.home" data-i18n-attr="aria-label" data-i18n-attr-key="footer.home">ОКНО</a>
+          <p data-i18n="footer.tagline">Общественно-политическое обозрение</p>
+        </div>
+        <div class="footer-nav">
+          <div class="footer-column">
+            <h2 data-i18n="footer.sections">Разделы</h2>
+            <a href="/" data-i18n="nav.top">Главное</a>
+            <a href="/auth/dispatches.html" data-i18n="nav.fil">Депеши</a>
+          </div>
+          <div class="footer-column">
+            <h2 data-i18n="footer.about">О редакции</h2>
+            <a href="/confidentialite.html" data-i18n="footer.privacy">Конфиденциальность</a>
+            <a href="/contacts.html" data-i18n="footer.contacts">Контакты</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <div>
+          <p>© 2026 «ОКНО». Все права защищены.</p>
+          <p>Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
+        </div>
+        <strong class="age-mark" aria-label="Для лиц старше восемнадцати лет">18+</strong>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/i18n.js"></script>
+  <script src="/auth/auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById("auth-time").textContent =
+        new Intl.DateTimeFormat((window.OKNO && window.OKNO.lang ? window.OKNO.lang() : "ru") === "en" ? "en-GB" : "ru-RU", {
+          weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow"
+        }).format(new Date()) + " (МСК)";
+    })();
+  </script>
+</body>
+</html>

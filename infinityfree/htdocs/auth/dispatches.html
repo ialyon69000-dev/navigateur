@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n-title="title.dispatches">Депеши — ОКНО</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .disp-wrap {
+      max-width: 780px;
+      margin: 2.5rem auto 0;
+      padding: 0 1.4rem 3rem;
+    }
+    .disp-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.8rem;
+      border-bottom: 2px solid var(--crimson);
+      padding-bottom: 0.7rem;
+      margin-bottom: 1.5rem;
+    }
+    .disp-title {
+      font-family: var(--serif);
+      font-size: 2rem;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .disp-user-label {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--mute);
+      letter-spacing: 0.04em;
+      background: rgba(176,137,62,0.08);
+      border: 1px solid var(--gold);
+      padding: 0.4em 0.8em;
+      border-radius: 20px;
+      line-height: 1.2;
+    }
+    .disp-user-label span {
+      color: var(--ink-2);
+    }
+    .disp-empty {
+      color: var(--mute);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      margin: 1.2rem 0 0;
+    }
+    .disp-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .disp-item {
+      display: flex;
+      gap: 1rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--rule);
+      text-decoration: none;
+      color: inherit;
+      align-items: baseline;
+    }
+    .disp-item .thumb {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(150deg, #1a1410, #2c221a);
+      flex: 0 0 72px;
+      width: 72px;
+      height: 54px;
+      border-radius: 2px;
+    }
+    .disp-item .thumb-ph {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: var(--serif);
+      font-size: 1.6rem;
+      color: rgba(247,241,230,0.7);
+    }
+    .disp-item .thumb img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .disp-item .body {
+      flex: 1;
+      min-width: 0;
+    }
+    .disp-item .meta {
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      color: var(--mute);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 0 0 0.25rem;
+    }
+    .disp-item .source {
+      color: var(--crimson-deep);
+      font-weight: 500;
+    }
+    .disp-item h3 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 1.15rem;
+      line-height: 1.25;
+      margin: 0 0 0.25rem;
+      color: var(--ink);
+    }
+    .disp-item .time {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--mute);
+      letter-spacing: 0.04em;
+    }
+    .disp-footer {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--crimson);
+      background: transparent;
+      color: var(--crimson);
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 0.86rem;
+      padding: 0.5rem 1rem;
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: background 0.12s, color 0.12s;
+      border-radius: 3px;
+    }
+    .btn:hover {
+      background: var(--crimson);
+      color: var(--ivory);
+    }
+    .btn i {
+      font-style: normal;
+      color: var(--gold-soft);
+      margin-right: 0.25rem;
+    }
+  </style>
+</head>
+<body data-i18n-title="title.dispatches">
+  <div class="paper-bg" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="mast" href="/">
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+      <h1 class="mast-title">ОКНО</h1>
+      <p class="mast-line" data-i18n="mast.tagline">Обозрение · Москва, Петербург, мир</p>
+      <span class="mast-ornament" aria-hidden="true">✦</span>
+    </a>
+    <p class="update-timer" id="disp-header-time">
+      <span class="update-pulse" aria-hidden="true"></span>
+      <span data-i18n="rail.edition">Архив депеш</span>
+      <span class="rail-dot"></span>
+      <time id="disp-time">—</time>
+    </p>
+  </header>
+
+  <main class="disp-wrap">
+    <div class="disp-header">
+      <h2 class="disp-title" data-i18n="disp.title">Депеши</h2>
+      <div class="disp-user-label" id="disp-user-label">
+        <span data-i18n="disp.guest">Гость</span>
+      </div>
+    </div>
+
+    <p class="disp-meta" id="disp-meta">
+      <strong>ID:</strong> <span id="disp-id">—</span> ·
+      <strong>Обновлено:</strong> <time id="disp-updated">—</time>
+    </p>
+
+    <ul class="disp-list" id="disp-list">
+      <li class="disp-empty" id="disp-empty">Депешей пока нет.</li>
+    </ul>
+
+    <div class="disp-footer">
+      <a class="btn" id="disp-login-btn" href="/auth/login.html"><i>✦</i> <span data-i18n="disp.login">Войти</span></a>
+    </div>
+  </main>
+
+  <footer class="media-footer">
+    <div class="footer-inner">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <a class="footer-logo" href="/" data-i18n="footer.home" data-i18n-attr="aria-label" data-i18n-attr-key="footer.home">ОКНО</a>
+          <p data-i18n="footer.tagline">Общественно-политическое обозрение</p>
+        </div>
+        <div class="footer-nav">
+          <div class="footer-column">
+            <h2 data-i18n="footer.sections">Разделы</h2>
+            <a href="/" data-i18n="nav.top">Главное</a>
+            <a href="/auth/dispatches.html" data-i18n="nav.fil">Депеши</a>
+          </div>
+          <div class="footer-column">
+            <h2 data-i18n="footer.about">О редакции</h2>
+            <a href="/confidentialite.html" data-i18n="footer.privacy">Конфиденциальность</a>
+            <a href="/contacts.html" data-i18n="footer.contacts">Контакты</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <div>
+          <p>© 2026 «ОКНО». Все права защищены.</p>
+          <p>Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
+        </div>
+        <strong class="age-mark" aria-label="Для лиц старше восемнадцати лет">18+</strong>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/i18n.js"></script>
+  <script src="/dispatches.js"></script>
+</body>
+</html>
