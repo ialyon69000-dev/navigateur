@@ -46,8 +46,9 @@ const crypto = require("crypto");
 
 function cookieValue(req, name) {
   const header = req.headers.cookie || "";
-  const m = header.match(new RegExp("(?:^|; )" + JSON.stringify(name).replace(/[{}]/g, "\\$&") + "=([^;]*)"));
-  return m && decodeURIComponent(m[1]) || null;
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const m = header.match(new RegExp("(?:^|;\\s*)" + escaped + "=([^;]*)"));
+  return (m && decodeURIComponent(m[1])) || null;
 }
 
 const app = express();
@@ -68,6 +69,83 @@ app.use((req, res, next) => {
     recordHit(req, null).catch((err) => console.error("recordHit", err.message || err));
   }
   next();
+});
+
+// ——— Auth ———
+const AUTH_FILE = path.join(DATA_DIR, "users.json");
+const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
+const AUTH_COOKIE = "okno-session";
+const AUTH_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
+
+function ensureAuthFile() {
+  if (!fs.existsSync(AUTH_FILE)) {
+    fs.writeFileSync(AUTH_FILE, "[]", "utf8");
+  }
+}
+
+function readUsers() {
+  ensureAuthFile();
+  try {
+    const raw = fs.readFileSync(AUTH_FILE, "utf8");
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeUsers(users) {
+  ensureAuthFile();
+  const tmp = AUTH_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(users, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, AUTH_FILE);
+}
+
+function sha256(str, salt) {
+  return crypto.createHash("sha256").update(str + salt).digest("hex");
+}
+
+function genSessionId() {
+  return "okno-" + crypto.randomBytes(18).toString("hex");
+}
+
+function loadSessionStore() {
+  try {
+    const raw = fs.readFileSync(SESSIONS_FILE, "utf8");
+    const map = JSON.parse(raw);
+    return map && typeof map === "object" ? map : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSessionStore(store) {
+  ensureDataFile();
+  const tmp = SESSIONS_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, SESSIONS_FILE);
+}
+
+function sessionUser(req) {
+  const sid = cookieValue(req, AUTH_COOKIE);
+  if (!sid) return null;
+  const store = loadSessionStore();
+  const sess = store[sid];
+  if (!sess || Date.now() - (sess.created || 0) > AUTH_TTL_MS) return null;
+  const users = readUsers();
+  return users.find((u) => u.id === sess.userId) || null;
+}
+
+// Le tableau de bord est protégé : sans session valide, redirection vers la
+// page de connexion. Déclaré avant express.static pour que le fichier
+// public/dashboard.html ne soit jamais servi sans authentification.
+app.get(["/dashboard.html", "/dashboard"], (req, res) => {
+  if (!sessionUser(req)) {
+    res.redirect("/auth/login.html");
+    return;
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(fs.readFileSync(path.join(__dirname, "public", "dashboard.html"), "utf8"));
 });
 
 app.use(
@@ -262,8 +340,57 @@ function charsetOf(contentType, xmlHead) {
 function looksBrokenCyrillic(s) {
   const sample = String(s || "").slice(0, 3000);
   const cyr = (sample.match(/[А-Яа-яЁё]/g) || []).length;
-  const repl = (sample.match(/�/g) || []).length;
+  const repl = (sample.match(/\uFFFD/g) || []).length;
   return cyr < 10 || repl > 4;
+}
+
+function isValidUtf8(buf) {
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function cyrillicScore(text) {
+  const sample = String(text || "").slice(0, 6000);
+  const cyr = (sample.match(/[А-Яа-яЁё]/g) || []).length;
+  const repl = (sample.match(/\uFFFD/g) || []).length;
+  return cyr - 5 * repl;
+}
+
+/*
+ * Décode un flux RSS en UTF-8 de façon robuste :
+ * 1. si les octets sont de l'UTF-8 valide, l'UTF-8 gagne toujours — même si
+ *    l'en-tête HTTP ou la déclaration XML annonce autre chose (source classique
+ *    des caractères cassés) ;
+ * 2. sinon on essaie le jeu déclaré puis windows-1251 / koi8-r, et on garde le
+ *    décodage qui donne le plus de lettres cyrilliques et le moins de U+FFFD.
+ */
+function decodeFeedBuffer(buf, declaredCharset) {
+  if (isValidUtf8(buf)) {
+    const text = iconv.decode(buf, "utf-8").replace(/^\uFEFF/, "");
+    if (!looksBrokenCyrillic(text) || declaredCharset === "utf-8" || !declaredCharset) {
+      return text;
+    }
+  }
+  const candidates = [];
+  for (const cs of [declaredCharset, "win1251", "koi8-r", "utf-8"]) {
+    if (cs && !candidates.includes(cs)) candidates.push(cs);
+  }
+  let best = null;
+  for (const cs of candidates) {
+    let text;
+    try {
+      text = iconv.decode(buf, cs);
+    } catch {
+      continue;
+    }
+    const score = cyrillicScore(text);
+    if (!best || score > best.score) best = { text, score };
+  }
+  return (best ? best.text : iconv.decode(buf, "utf-8")).replace(/^\uFEFF/, "");
 }
 
 async function fetchFeed(feed) {
@@ -280,9 +407,7 @@ async function fetchFeed(feed) {
   if (!res.ok) throw new Error("http " + res.status);
   const buf = Buffer.from(await res.arrayBuffer());
   const headAscii = buf.subarray(0, 220).toString("latin1");
-  let xml = iconv.decode(buf, charsetOf(res.headers.get("content-type"), headAscii));
-  if (looksBrokenCyrillic(xml)) xml = iconv.decode(buf, "win1251");
-  xml = xml.replace(/^\uFEFF/, "");
+  const xml = decodeFeedBuffer(buf, charsetOf(res.headers.get("content-type"), headAscii));
   const parsed = await parser.parseString(xml);
   return (parsed.items || []).slice(0, 24).map((item) => ({
     id: item.guid || item.link || `${feed.id}-${item.title}`,
@@ -296,6 +421,26 @@ async function fetchFeed(feed) {
     summary: stripHtml(item.contentSnippet || item.summary || item.description).slice(0, 280),
     image: guessImage(item, feed.id, pickImage(item)),
   }));
+}
+
+function readDiskCache() {
+  try {
+    const raw = fs.readFileSync(NEWS_CACHE_FILE, "utf8");
+    const data = JSON.parse(raw);
+    if (data && Array.isArray(data.items)) return data;
+  } catch {}
+  return null;
+}
+
+function writeDiskCache(items, errors) {
+  try {
+    ensureDataFile();
+    const tmp = NEWS_CACHE_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify({ at: Date.now(), items, errors }) + "\n", "utf8");
+    fs.renameSync(tmp, NEWS_CACHE_FILE);
+  } catch (err) {
+    console.error("writeDiskCache", err.message || err);
+  }
 }
 
 async function loadNews(force) {
@@ -333,7 +478,27 @@ async function loadNews(force) {
       perSource.set(it.sourceId, n + 1);
     } else leftover.push(it);
   }
-  newsCache = { at: now, items: balanced.concat(leftover).slice(0, 120), errors };
+  const merged = balanced.concat(leftover).slice(0, 120);
+  if (merged.length) {
+    writeDiskCache(merged, errors);
+    newsCache = { at: now, items: merged, errors };
+    return newsCache;
+  }
+  // Aucun flux joignable : sert le dernier instantané propre enregistré sur
+  // disque (toujours UTF-8) plutôt qu'une page vide. On re-nettoie les champs
+  // texte au passage (entités HTML résiduelles type &#34;).
+  const disk = readDiskCache();
+  if (disk && disk.items.length) {
+    const cleaned = disk.items.slice(0, 120).map((it) => ({
+      ...it,
+      title: decodeEntities(it.title) || "(sans titre)",
+      summary: it.summary ? decodeEntities(it.summary) : null,
+      category: it.category ? decodeEntities(it.category) : null,
+    }));
+    newsCache = { at: now, items: cleaned, errors };
+    return newsCache;
+  }
+  newsCache = { at: now, items: [], errors };
   return newsCache;
 }
 
@@ -614,70 +779,8 @@ app.get("/api/visits.json", (req, res) => {
   res.type("application/json").send(fs.readFileSync(VISITS_FILE, "utf8"));
 });
 
-// ——— Auth ———
-const AUTH_FILE = path.join(DATA_DIR, "users.json");
-const AUTH_COOKIE = "okno-session";
-const AUTH_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
-
-function ensureAuthFile() {
-  if (!fs.existsSync(AUTH_FILE)) {
-    fs.writeFileSync(AUTH_FILE, "[]", "utf8");
-  }
-}
-
-function readUsers() {
-  ensureAuthFile();
-  try {
-    const raw = fs.readFileSync(AUTH_FILE, "utf8");
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeUsers(users) {
-  ensureAuthFile();
-  const tmp = AUTH_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(users, null, 2) + "\n", "utf8");
-  fs.renameSync(tmp, AUTH_FILE);
-}
-
-function sha256(str, salt) {
-  return crypto.createHash("sha256").update(str + salt).digest("hex");
-}
-
-function genSessionId() {
-  return "okno-" + crypto.randomBytes(18).toString("hex");
-}
-
-function loadSessionStore() {
-  const key = AUTH_COOKIE + "-store";
-  try {
-    const raw = fs.readFileSync(key, "utf8");
-    const map = JSON.parse(raw);
-    return map && typeof map === "object" ? map : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeSessionStore(store) {
-  const key = AUTH_COOKIE + "-store";
-  const tmp = key + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
-  fs.renameSync(tmp, key);
-}
-
 app.get("/api/auth/me", (req, res) => {
-  const sid = cookieValue(req, AUTH_COOKIE);
-  const store = loadSessionStore();
-  const sess = store[sid];
-  if (!sess || Date.now() - (sess && sess.created || 0) > AUTH_TTL_MS) {
-    return res.json({ ok: false, user: null });
-  }
-  const users = readUsers();
-  const user = users.find((u) => u.id === sess.userId);
+  const user = sessionUser(req);
   if (!user) {
     return res.json({ ok: false, user: null });
   }
@@ -706,7 +809,7 @@ app.post("/api/auth/login", (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: AUTH_TTL_MS / 1000,
+    maxAge: AUTH_TTL_MS, // millisecondes — express convert en secondes tout seul
     path: "/",
   });
   res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role } });
@@ -772,31 +875,24 @@ app.get("/api/dispatches", (req, res) => {
   res.json({ updatedAt: new Date().toISOString(), items: dispatches });
 });
 
-// ——— Protected route: dashboard ———
-app.get("/dashboard.html", (req, res) => {
-  const sid = req.cookies[AUTH_COOKIE];
-  const store = loadSessionStore();
-  const sess = store[sid];
-  if (!sess || Date.now() - sess.created > AUTH_TTL_MS) {
-    res.redirect("/auth/login.html");
-    return;
-  }
-  const users = readUsers();
-  const user = users.find((u) => u.id === sess.userId);
-  if (!user) {
-    res.redirect("/auth/login.html");
-    return;
-  }
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(fs.readFileSync(path.join(__dirname, "htdocs", "dashboard.html"), "utf8"));
-});
-
 ensureDataFile();
 ensureAuthFile();
-loadNews(true).catch(() => {});
 
-app.listen(PORT, HOST, () => {
-  console.log(`Empreinte écoute sur http://${HOST}:${PORT}`);
-  console.log(`DATA_DIR=${DATA_DIR} (persistent: ${DATA_DIR !== path.join(__dirname, "data")})`);
-  console.log(`Visits file: ${VISITS_FILE}`);
-});
+if (require.main === module) {
+  loadNews(true).catch(() => {});
+  app.listen(PORT, HOST, () => {
+    console.log(`Empreinte écoute sur http://${HOST}:${PORT}`);
+    console.log(`DATA_DIR=${DATA_DIR} (persistent: ${DATA_DIR !== path.join(__dirname, "data")})`);
+    console.log(`Visits file: ${VISITS_FILE}`);
+  });
+}
+
+module.exports = {
+  app,
+  decodeFeedBuffer,
+  charsetOf,
+  fetchFeed,
+  stripHtml,
+  cookieValue,
+  FEEDS,
+};

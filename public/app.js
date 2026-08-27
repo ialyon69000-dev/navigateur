@@ -652,14 +652,52 @@
     root.appendChild(frag);
   }
 
+  // Un titre « cassé » (mauvais codage de caractères) : presque aucune lettre
+  // cyrillique mais beaucoup de « ? » / U+FFFD. On l'écarte pour ne jamais
+  // afficher de charabia du type « Ã© » / « Ð » ».
+  function isBrokenTitle(title) {
+    const s = String(title || "");
+    const cyr = (s.match(/[А-Яа-яЁё]/g) || []).length;
+    const junk = (s.match(/[?\uFFFD]/g) || []).length;
+    return cyr < 2 && junk >= 4;
+  }
+
   async function loadNews() {
     const status = $("news-status");
     try {
-      const res = await fetch("/api/news");
-      const data = await res.json();
-      const items = (data.items || []).slice();
-      state.news = items;
-      renderNews(items);
+      // Fusionne toutes les sources joignables : l'API locale (/api/news) et
+      // le cache GitHub rafraîchi par Actions, pour ne jamais rester vide et
+      // pour écarter les éléments au codage cassé.
+      const cacheUrl =
+        "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" +
+        Math.floor(Date.now() / 300000);
+      const probes = [
+        fetch("/api/news").then((res) => {
+          if (!res.ok) throw new Error("Local news cache unavailable");
+          return res.json();
+        }),
+        fetch(cacheUrl, { cache: "no-store" }).then((res) => {
+          if (!res.ok) throw new Error("GitHub cache unavailable");
+          return res.json();
+        }),
+      ];
+      const results = await Promise.allSettled(probes);
+      const seen = new Set();
+      const merged = [];
+      for (const result of results) {
+        if (result.status !== "fulfilled" || !result.value) continue;
+        const items = Array.isArray(result.value.items) ? result.value.items : [];
+        for (const item of items) {
+          const key = String(item.title || "").toLowerCase().slice(0, 120);
+          if (!key || seen.has(key) || isBrokenTitle(item.title)) continue;
+          seen.add(key);
+          merged.push(item);
+        }
+      }
+      merged.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+      if (!merged.length) throw new Error("No news source available");
+      state.news = merged;
+      renderNews(merged);
     } catch (err) {
       console.error("OKNO news", err);
       if (status) {
@@ -669,8 +707,48 @@
     }
   }
 
+  // ——— Zone de connexion (en-tête) ———
+  async function renderAuthZone() {
+    const zone = $("auth-zone");
+    if (!zone) return;
+    const sep = '<span class="rail-dot"></span>';
+    let user = null;
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json().catch(() => ({}));
+      if (data && data.ok && data.user) user = data.user;
+    } catch {
+      user = null;
+    }
+    if (user) {
+      const esc = (s) =>
+        String(s || "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+      zone.innerHTML =
+        `<span class="auth-user">${T("authzone.user", esc(user.login))}</span>` +
+        sep +
+        `<a href="/dashboard.html" data-i18n="authzone.dashboard">${T("authzone.dashboard")}</a>` +
+        sep +
+        `<button type="button" class="auth-link" id="authzone-logout">${T("authzone.logout")}</button>`;
+      const btn = $("authzone-logout");
+      if (btn) {
+        btn.addEventListener("click", async () => {
+          try {
+            await fetch("/api/auth/logout", { method: "POST" });
+          } catch {}
+          renderAuthZone();
+        });
+      }
+    } else {
+      zone.innerHTML =
+        `<a href="/auth/login.html">${T("authzone.login")}</a>` +
+        sep +
+        `<a href="/auth/register.html">${T("authzone.register")}</a>`;
+    }
+  }
+
   async function initHome() {
     loadNews().catch((err) => console.error("news", err));
+    renderAuthZone().catch((err) => console.error("auth-zone", err));
     try {
       await loadMeAndClient();
       await recordVisit();
@@ -775,6 +853,7 @@
       }
       if (state.news.length) renderNews(state.news);
       if (labData) renderLabTable(labData);
+      if ($("auth-zone")) renderAuthZone();
     };
   }
 
