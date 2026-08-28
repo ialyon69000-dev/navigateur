@@ -1,0 +1,53 @@
+name: Deploy PHP to InfinityFree
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infinityfree/htdocs/**'
+      - '.github/workflows/deploy-infinityfree.yml'
+  workflow_dispatch:
+    inputs:
+      include_data:
+        description: 'Include data/ folder (first install)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP (without data - preserves server data)
+        if: ${{ !inputs.include_data }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./infinityfree/htdocs/
+          server-dir: ./htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/data/**
+          dangerous-clean-slate: false
+          log-level: standard
+
+      - name: Deploy via FTP (with data - first install)
+        if: ${{ inputs.include_data }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./infinityfree/htdocs/
+          server-dir: ./htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+          dangerous-clean-slate: false
+          log-level: standard
