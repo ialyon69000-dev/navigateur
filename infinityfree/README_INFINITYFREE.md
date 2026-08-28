@@ -26,7 +26,11 @@ api/
   visit.php            POST /api/visit
   visits.php           GET/DELETE /api/visits
   health.php           GET  /api/health
-  dispatches.php       GET  /api/dispatches
+  dispatches.php       GET  /api/dispatches — la bande et ses sources
+                       POST /api/dispatches, DELETE ?id= — rédaction seulement
+  messages.php         GET  /api/messages   — messages vus dans dashboard.html
+                       (?all=1 : brouillons, admin seul) ; POST / DELETE : admin
+  _content.php         fonctions communes : sanitisation + contrôle des droits
   auth/
     _auth.php          logique commune (cookie okno-session, sha256+sel, sessions)
     challenge.php      GET  /api/auth/challenge — donne le sel du compte
@@ -38,7 +42,8 @@ data/
   users.json           comptes (seed : éditeur « okno »)
   sessions.json        sessions actives
   visits.json          journal des visites
-  dispatches.json      dépêches du tableau de bord
+  dispatches.json      dépêches de la bande (sources : visibles par la rédaction)
+  messages.json        messages affichés par la rédaction dans le tableau de bord
   news_cache.json      dernier instantané propre des flux (UTF-8)
   .htaccess            interdit l'accès direct au dossier
 ```
@@ -57,7 +62,12 @@ data/
 7. **`dashboard.html` reste une page statique** : sur InfinityFree il n'y a pas
    de serveur Node pour la protéger, c'est `dashboard.js` qui redirige vers la
    page de connexion si `/api/auth/me` répond « non connecté ». Les dépêches
-   (`/api/dispatches`) restent donc lisibles sans session.
+   (`/api/dispatches`) restent donc lisibles sans session — en revanche **un
+   lecteur n'affiche que les messages de la rédaction** : `dashboard.js` ne
+   demande `/api/dispatches` que si `/api/auth/me` renvoie le rôle
+   administrateur, et les écritures (`POST`/`DELETE`) sont refusées côté serveur
+   (401 sans session, 403 pour un rôle `reader`) — la page seule ne fait pas la
+   sécurité.
 
 ## Connexion : plus aucun mot de passe en clair
 
@@ -91,13 +101,14 @@ Garde-fous côté page : le formulaire est en `method="post"` et son
 le script n'a pas démarré. Enfin, si le `.htaccess` n'a pas été remis à jour,
 `auth.js` retombe tout seul sur les URL `.php` (`/api/auth/login.php` …).
 
-### Fichiers à renvoyer sur le serveur après cette mise à jour
+### Fichiers à renvoyer sur le serveur après une mise à jour
+
+Schéma de connexion (hash côté navigateur) :
 
 ```
 auth/auth.js            (nouvelle logique de hachage)
 auth/login.html         (method="post" + garde-fou + auth.js?v=2)
 auth/register.html      (idem)
-i18n.js                 (2 nouveaux messages)
 api/auth/_auth.php      (schéma 2, erreurs d'écriture explicites)
 api/auth/challenge.php  (NOUVEAU)
 api/auth/login.php      (vérification du hash + migration)
@@ -105,6 +116,23 @@ api/auth/register.php   (sel fourni par le navigateur)
 api/health.php          (diagnostic data/)
 .htaccess               (réécriture /api/auth/challenge)
 ```
+
+Rôles traduits + messages de la rédaction dans le tableau de bord :
+
+```
+i18n.js, dashboard.js, dashboard.html       (rôles traduits, sections admin)
+dispatches.js, auth/dispatches.html         (rôle traduit sur la page publique)
+api/messages.php, api/_content.php          (NOUVEAU — droits + sanitisation)
+api/dispatches.php                          (POST/DELETE en plus du GET)
+api/auth/_auth.php                          (/api/auth/me renvoie createdAt)
+data/messages.json                          (NOUVEAU — messages bilingues ru/en)
+.htaccess                                   (réécriture /api/messages)
+```
+
+⚠️ `data/` n'est **pas** renvoyé par le déploiement automatique (pour préserver
+les données du serveur) : pour un premier déploiement, cocher `include_data`, ou
+éditer le fichier à la main dans le File Manager. Côté PHP, `data/messages.json`
+est créé à la première écriture si le dossier est inscriptible.
 
 Puis **Ctrl+F5** dans le navigateur : le `.htaccess` met le JS en cache 1 h.
 

@@ -2,3 +2,8 @@ node_modules/
 npm-debug.log*
 data/*.json
 infinityfree/htdocs/data/*.json
+
+# Seed versionnés (comme users.json / dispatches.json) : premier démarrage du
+# tableau de bord avec un message d'accueil de la rédaction.
+!data/messages.json
+!infinityfree/htdocs/data/messages.json

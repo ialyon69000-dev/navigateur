@@ -240,6 +240,8 @@ function auth_public_user($user) {
         'id' => isset($user['id']) ? $user['id'] : null,
         'login' => isset($user['login']) ? $user['login'] : null,
         'role' => isset($user['role']) ? $user['role'] : 'reader',
+        // Le tableau de bord affiche la date de création du compte.
+        'createdAt' => isset($user['createdAt']) ? $user['createdAt'] : null,
     ];
 }
 

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "m_welcome",
+    "title": {
+      "ru": "Личный кабинет открыт",
+      "en": "Your dashboard is open"
+    },
+    "body": {
+      "ru": "Редакция публикует здесь сообщения для читателей. Источники ленты остаются внутри редакции: их видит только редактор.",
+      "en": "The newsroom posts its notes for readers here. The feed sources stay inside the newsroom: only the editor sees them."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-28T09:00:00+00:00",
+    "updatedAt": "2026-08-28T09:00:00+00:00"
+  },
+  {
+    "id": "m_rubriques",
+    "title": {
+      "ru": "Как читать сообщения",
+      "en": "How to read these notes"
+    },
+    "body": {
+      "ru": "Каждое сообщение написано на двух языках. Переключите язык флагами вверху страницы — текст сменится вместе с ролью под заголовком.",
+      "en": "Every note is written in two languages. Switch the language with the flags on top of the page — the text changes, and so does the label under your role."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-27T18:30:00+00:00",
+    "updatedAt": "2026-08-27T18:30:00+00:00"
+  }
+]
