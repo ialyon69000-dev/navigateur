@@ -161,7 +161,7 @@
 
       <div class="auth-error" id="auth-error" role="alert"></div>
 
-      <form class="auth-form" id="auth-form" novalidate>
+      <form class="auth-form" id="auth-form" method="post" novalidate onsubmit="return window.OKNO_AUTH_READY === true">
         <label for="login" data-i18n="register.login-label">Логин</label>
         <input id="login" name="login" type="text" autocomplete="username" placeholder="ваш_логин" required minlength="3" maxlength="40" />
 
@@ -202,7 +202,7 @@
   </footer>
 
   <script src="/i18n.js"></script>
-  <script src="/auth/auth.js"></script>
+  <script src="/auth/auth.js?v=2"></script>
   <script>
     (function () {
       document.getElementById("auth-time").textContent =

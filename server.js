@@ -105,6 +105,53 @@ function sha256(str, salt) {
   return crypto.createHash("sha256").update(str + salt).digest("hex");
 }
 
+// ——— Schéma de hachage (identique à la version PHP) ———
+// Le navigateur envoie H1 = sha256(mot_de_passe + sel) ; le serveur stocke
+// H2 = sha256(H1 + sel). Le mot de passe en clair ne transite jamais.
+const AUTH_SCHEME = 2;
+const SALT_RE = /^[A-Za-z0-9._-]{1,64}$/;
+const CLIENT_HASH_RE = /^[a-f0-9]{64}$/;
+
+function hashFromClient(clientHash, salt) {
+  return sha256(clientHash, salt);
+}
+
+// Sel de substitution pour un login inconnu : évite l'énumération de comptes.
+function decoySalt(login) {
+  return sha256("okno-decoy|" + String(login).trim().toLowerCase(), "").slice(0, 16);
+}
+
+// Sel déjà stocké : les comptes créés avant dérivaient le sel du login
+// (« jean marc-m1abc »), espaces et cyrillique compris — on ne peut donc pas
+// leur imposer le format strict sans casser leur connexion.
+function saltIsUsable(salt) {
+  return typeof salt === "string" && salt.length > 0 && salt.length <= 64 && !/[\u0000-\u001f\u007f]/.test(salt);
+}
+
+function timingSafeEqualHex(a, b) {
+  const x = String(a || "");
+  const y = String(b || "");
+  if (x.length !== y.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(x, "hex"), Buffer.from(y, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+// Refus systématique du mot de passe en clair (ancienne copie de auth.js en cache).
+function rejectCleartext(body, res) {
+  if (body && typeof body.password === "string" && body.password !== "") {
+    res.status(400).json({
+      ok: false,
+      error: "Старая версия скрипта входа. Обновите страницу (Ctrl+F5) и попробуйте снова.",
+      reason: "cleartext-password",
+    });
+    return true;
+  }
+  return false;
+}
+
 function genSessionId() {
   return "okno-" + crypto.randomBytes(18).toString("hex");
 }
@@ -787,18 +834,54 @@ app.get("/api/auth/me", (req, res) => {
   res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role } });
 });
 
-app.post("/api/auth/login", (req, res) => {
-  const { login, password } = req.body || {};
-  if (!login || !password) {
-    return res.status(400).json({ ok: false, error: "Заполните логин и пароль." });
+app.get("/api/auth/challenge", (req, res) => {
+  const login = String((req.query && req.query.login) || "").trim();
+  if (!login || login.length > 40) {
+    return res.json({ ok: true, salt: decoySalt(login), scheme: AUTH_SCHEME });
   }
   const users = readUsers();
-  const user = users.find((u) => u.login.toLowerCase() === (login || "").toLowerCase());
-  if (!user) {
+  const user = users.find((u) => u.login.toLowerCase() === login.toLowerCase());
+  if (!user || !saltIsUsable(user.salt)) {
+    return res.json({ ok: true, salt: decoySalt(login), scheme: AUTH_SCHEME });
+  }
+  res.json({ ok: true, salt: user.salt, scheme: AUTH_SCHEME });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const body = req.body || {};
+  if (rejectCleartext(body, res)) return;
+  const login = String(body.login || "").trim();
+  const hash = String(body.hash || "").trim().toLowerCase();
+  if (!login || !hash) {
+    return res.status(400).json({ ok: false, error: "Заполните логин и пароль." });
+  }
+  if (!CLIENT_HASH_RE.test(hash)) {
+    return res.status(400).json({
+      ok: false,
+      error: "Неверный формат данных входа. Обновите страницу (Ctrl+F5).",
+      reason: "bad-hash-format",
+    });
+  }
+  const users = readUsers();
+  const idx = users.findIndex((u) => u.login.toLowerCase() === login.toLowerCase());
+  if (idx < 0) {
     return res.status(401).json({ ok: false, error: "Неверный логин или пароль." });
   }
-  const hash = sha256(password, user.salt);
-  if (hash !== user.hash) {
+  const user = users[idx];
+  const expected = hashFromClient(hash, user.salt || "");
+  let migrated = false;
+  if (timingSafeEqualHex(expected, user.hash)) {
+    // schéma courant
+  } else if (timingSafeEqualHex(hash, user.hash)) {
+    // ancien schéma (H1 stocké tel quel) : migration sans mot de passe en clair
+    users[idx] = Object.assign({}, user, {
+      hash: expected,
+      scheme: AUTH_SCHEME,
+      migratedAt: new Date().toISOString(),
+    });
+    writeUsers(users);
+    migrated = true;
+  } else {
     return res.status(401).json({ ok: false, error: "Неверный логин или пароль." });
   }
   const store = loadSessionStore();
@@ -812,31 +895,41 @@ app.post("/api/auth/login", (req, res) => {
     maxAge: AUTH_TTL_MS, // millisecondes — express convert en secondes tout seul
     path: "/",
   });
-  res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role } });
+  res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role }, migrated });
 });
 
 app.post("/api/auth/register", (req, res) => {
-  const { login, password } = req.body || {};
-  if (!login || !password) {
+  const body = req.body || {};
+  if (rejectCleartext(body, res)) return;
+  const login = String(body.login || "").trim();
+  const hash = String(body.hash || "").trim().toLowerCase();
+  const salt = String(body.salt || "").trim();
+  if (!login || !hash || !salt) {
     return res.status(400).json({ ok: false, error: "Укажите логин и пароль." });
   }
-  if ((login || "").length < 3 || (login || "").length > 40) {
-    return res.status(400).json({ ok: false, error: "Логин от 3 до 40 знаков." });
+  if (!CLIENT_HASH_RE.test(hash)) {
+    return res.status(400).json({
+      ok: false,
+      error: "Неверный формат данных регистрации. Обновите страницу (Ctrl+F5).",
+      reason: "bad-hash-format",
+    });
   }
-  if ((password || "").length < 6) {
-    return res.status(400).json({ ok: false, error: "Пароль от 6 знаков." });
+  if (!SALT_RE.test(salt)) {
+    return res.status(400).json({ ok: false, error: "Неверный формат соли." });
+  }
+  if (login.length < 3 || login.length > 40) {
+    return res.status(400).json({ ok: false, error: "Логин от 3 до 40 знаков." });
   }
   const users = readUsers();
   if (users.find((u) => u.login.toLowerCase() === login.toLowerCase())) {
     return res.status(409).json({ ok: false, error: "Этот логин уже занят." });
   }
-  const salt = login + "-" + Date.now().toString(36);
-  const hash = sha256(password, salt);
   const newUser = {
     id: "u_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
     login,
-    hash,
+    hash: hashFromClient(hash, salt),
     salt,
+    scheme: AUTH_SCHEME,
     createdAt: new Date().toISOString(),
     role: "reader",
   };
@@ -894,5 +987,9 @@ module.exports = {
   fetchFeed,
   stripHtml,
   cookieValue,
+  sha256,
+  hashFromClient,
+  decoySalt,
+  AUTH_SCHEME,
   FEEDS,
 };
