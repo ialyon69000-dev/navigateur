@@ -353,8 +353,6 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "dash.stat-dispatches": { ru: "Депеши", en: "Dispatches" },
     "dash.stat-dispatches-note": { ru: "В архиве личной рассылки", en: "In the personal mailing archive" },
     "dash.stat-role": { ru: "Роль", en: "Role" },
-    "dash.stat-role-note": { ru: "Права доступа", en: "Access rights" },
-    "dash.dispatches-title": { ru: "Депеши", en: "Dispatches" },
     "dash.updated": { ru: "Обновлено:", en: "Updated:" },
     "dash.items": { ru: " — ", en: " — " },
     "dash.items-total": { ru: " заявок", en: " items" },
@@ -364,8 +362,93 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "dash.th-time": { ru: "Время (МСК)", en: "Time (MSK)" },
     "dash.no-dispatches": { ru: "Нет депеш в архиве.", en: "No dispatches in the archive." },
     "dash.logout": { ru: "Выйти", en: "Sign out" },
-    "dash.role-reader": { ru: "Читатель", en: "Reader" },
-    "dash.role-editor": { ru: "Редактор", en: "Editor" },
+    // ——— Rôles : le libellé vient toujours du dictionnaire, jamais du serveur ———
+    // reader / editor (= administrateur du projet) / admin (alias toléré).
+    "role.reader": { ru: "Читатель", en: "Reader" },
+    "role.editor": { ru: "Редактор", en: "Editor" },
+    "role.admin": { ru: "Администратор", en: "Administrator" },
+    "role.unknown": { ru: (r) => `Роль: ${r}`, en: (r) => `Role: ${r}` },
+    "dash.rights-reader": {
+      ru: "Видит сообщения редакции, не видит источников ленты",
+      en: "Sees the newsroom's messages, never the feed sources",
+    },
+    "dash.rights-editor": {
+      ru: "Управляет лентой и сообщениями редакции",
+      en: "Manages the feed and the newsroom's messages",
+    },
+
+    // ——— Messages de la rédaction : ce que l'utilisateur voit ———
+    "dash.messages-title": { ru: "Сообщения редакции", en: "Newsroom messages" },
+    "dash.messages-hint": {
+      ru: "Только тексты редакции: источники ленты здесь не показываются.",
+      en: "The newsroom's notes only: feed sources are never displayed here.",
+    },
+    "dash.messages-empty": { ru: "Пока нет сообщений от редакции.", en: "No newsroom message yet." },
+    "dash.stat-messages": { ru: "Сообщения", en: "Messages" },
+    "dash.stat-messages-note": { ru: "Опубликовано редакцией", en: "Published by the newsroom" },
+    "dash.msg-by": { ru: (who) => `от ${who}`, en: (who) => `by ${who}` },
+    "dash.msg-draft": { ru: "черновик", en: "draft" },
+
+    // ——— Admin : gestion des messages ———
+    "dash.msg-admin-title": { ru: "Публикация сообщений", en: "Publishing the messages" },
+    "dash.msg-admin-sub": {
+      ru: "Что видят читатели в личном кабинете. Достаточно одного языка — второй подставится, если останется пустым.",
+      en: "What readers see in their dashboard. One language is enough — the other falls back to it if left empty.",
+    },
+    "dash.msg-form-new": { ru: "Новое сообщение", en: "New message" },
+    "dash.msg-form-edit": { ru: "Правка сообщения", en: "Editing a message" },
+    "dash.msg-f-title-ru": { ru: "Заголовок — русский", en: "Headline — Russian" },
+    "dash.msg-f-title-en": { ru: "Заголовок — английский", en: "Headline — English" },
+    "dash.msg-f-body-ru": { ru: "Текст — русский", en: "Text — Russian" },
+    "dash.msg-f-body-en": { ru: "Текст — английский", en: "Text — English" },
+    "dash.msg-f-active": { ru: "Показать читателям", en: "Show to readers" },
+    "dash.msg-save": { ru: "Сохранить", en: "Save" },
+    "dash.msg-reset": { ru: "Новое сообщение", en: "Start a new one" },
+    "dash.msg-edit": { ru: "Править", en: "Edit" },
+    "dash.msg-publish": { ru: "Опубликовать", en: "Publish" },
+    "dash.msg-unpublish": { ru: "Снять с публикации", en: "Unpublish" },
+    "dash.msg-delete": { ru: "Удалить", en: "Delete" },
+    "dash.msg-need-title": { ru: "Заполните заголовок хотя бы на одном языке.", en: "Fill in the headline in at least one language." },
+    "dash.msg-saved": { ru: "Сообщение сохранено.", en: "Message saved." },
+    "dash.msg-deleted": { ru: "Сообщение удалено.", en: "Message deleted." },
+    "dash.msg-confirm": { ru: "Удалить это сообщение безвозвратно?", en: "Delete this message for good?" },
+    "dash.msg-list-empty": { ru: "Ни одного сообщения — даже черновика.", en: "No message at all — not even a draft." },
+
+    // ——— Admin : gestion de la bande (les flux) ———
+    "dash.flux-title": { ru: "Лента и её источники", en: "The feed and its sources" },
+    "dash.flux-sub": {
+      ru: "Видно только редакции. Читатели получают лишь сообщения выше.",
+      en: "Editorial office only. Readers get just the messages above.",
+    },
+    "dash.flux-form-new": { ru: "Новая депеша", en: "New dispatch" },
+    "dash.flux-form-edit": { ru: "Правка депеши", en: "Editing a dispatch" },
+    "dash.flux-f-cat": { ru: "Раздел", en: "Section" },
+    "dash.flux-f-source": { ru: "Источник (название редакции)", en: "Source (the newsroom name)" },
+    "dash.flux-f-title": { ru: "Заголовок", en: "Headline" },
+    "dash.flux-f-summary": { ru: "Кратко", en: "Summary" },
+    "dash.flux-f-link": { ru: "Ссылка", en: "Link" },
+    "dash.flux-f-image": { ru: "Картинка — URL", en: "Image — URL" },
+    "dash.flux-add": { ru: "Добавить в ленту", en: "Add to the feed" },
+    "dash.flux-update": { ru: "Сохранить депешу", en: "Save the dispatch" },
+    "dash.flux-reset": { ru: "Новая депеша", en: "Start a new one" },
+    "dash.flux-need-title": { ru: "Заполните заголовок депеши.", en: "Fill in the dispatch headline." },
+    "dash.flux-saved": { ru: "Депеша сохранена.", en: "Dispatch saved." },
+    "dash.flux-deleted": { ru: "Депеша удалена из ленты.", en: "Dispatch removed from the feed." },
+    "dash.flux-confirm": { ru: "Убрать эту депешу из ленты?", en: "Remove this dispatch from the feed?" },
+
+    // ——— États communs aux deux formulaires d'admin ———
+    "dash.saving": { ru: "Сохранение…", en: "Saving…" },
+    "dash.forbidden": {
+      ru: "Только редакция может менять ленту и сообщения.",
+      en: "Only the editorial office can change the feed and the messages.",
+    },
+    "dash.auth-required": { ru: "Сессия истекла — войдите снова.", en: "Session expired — please sign in again." },
+    "dash.save-error": {
+      ru: "Сервер не сохранил изменения. Проверьте права на папку data/ и перезагрузите страницу.",
+      en: "The server did not save. Check the rights on the data/ folder and reload the page.",
+    },
+    "dash.network-error": { ru: "Сервер недоступен. Перезагрузите страницу.", en: "Server unreachable. Reload the page." },
+    "dash.created": { ru: "Создан:", en: "Created:" },
     "disp.no-dispatches": { ru: "Депешей пока нет.", en: "No dispatches yet." },
     "disp.error": { ru: "Не удалось загрузить депеши.", en: "Could not load dispatches." },
     "disp.login": { ru: "Войти", en: "Sign in" },
@@ -499,11 +582,41 @@ function buildSwitcher() {
   document.body.appendChild(wrap);
 }
 
+  // ——— Rôles : un seul endroit transforme un rôle en mot visible ———
+  // « editor » est le rôle administrateur du projet ; « admin » est toléré pour
+  // les comptes édités à la main dans data/users.json.
+  const ROLE_LABEL_KEYS = { reader: "role.reader", editor: "role.editor", admin: "role.admin" };
+  const ADMIN_ROLES = ["editor", "admin"];
+
+  function roleLabel(role) {
+    const key = ROLE_LABEL_KEYS[String(role || "reader").toLowerCase()];
+    return key ? t(key) : t("role.unknown", role || "?");
+  }
+
+  function isAdminRole(role) {
+    return ADMIN_ROLES.includes(String(role || "").toLowerCase());
+  }
+
+  function isAdmin(user) {
+    return !!user && isAdminRole(user.role);
+  }
+
+  // Un champ bilingue { ru, en } se lit dans la langue courante, avec repli.
+  function loc(field) {
+    if (field == null) return "";
+    if (typeof field === "string") return field;
+    return String(field[current] || field.ru || field.en || "");
+  }
+
   // Expose to app.js for dynamic content
   window.OKNO = window.OKNO || {};
   window.OKNO.lang = () => current;
   window.OKNO.t = t;
   window.OKNO.setLang = setLanguage;
+  window.OKNO.roleLabel = roleLabel;
+  window.OKNO.isAdminRole = isAdminRole;
+  window.OKNO.isAdmin = isAdmin;
+  window.OKNO.loc = loc;
   window.OKNO.onLangChange = null;
 
   current = detect();

@@ -17,16 +17,48 @@ comptes de l'ancien schéma sont migrés au premier login. Réinitialiser un mot
 passe : `node scripts/auth-user.mjs <login> <mot_de_passe> --role editor`.
 
 ```bash
-npm test   # sha256 de repli, auth.js, API PHP de bout en bout, API Node
+npm test   # sha256 de repli, auth.js, API PHP de bout en bout, API Node, tableau de bord
 ```
+
+## Rôles et contenu éditorial (identiques dans les deux versions)
+
+Deux rôles seulement, et **le libellé n'est jamais renvoyé par le serveur** :
+l'interface traduit `reader` / `editor` via le dictionnaire RU/EN
+(`OKNO.roleLabel`, voir `public/i18n.js`) — un `admin` est toléré dans
+`data/users.json` et affiche « Администратор / Administrator ».
+
+| Rôle | Ce qu'il gère | Ce qu'il voit dans `/dashboard.html` |
+|------|---------------|--------------------------------------|
+| `editor` (= admin du projet) | la bande (les flux **et leurs sources**) **et** les messages affichés aux utilisateurs | messages + « Publications des messages » + « La bande et ses sources » |
+| `reader` | rien | **uniquement** les messages publiés par la rédaction |
+
+Un lecteur ne reçoit donc jamais la source d'un flux : `dashboard.js` n'appelle
+`/api/dispatches` que si le rôle est administrateur, et le tableau reste vide
+dans la page servie.
+
+Écrire (messages ou bande) exige une session valide + un rôle administrateur :
+
+| Route | Effet | Droits |
+|-------|-------|--------|
+| `GET /api/messages` | messages publiés ; `?all=1` ajoute les brouillons (admin seulement) | public |
+| `POST /api/messages` | créer (sans `id`) ou mettre à jour (avec `id`) ; un envoi partiel ne vide pas les autres champs | admin |
+| `DELETE /api/messages?id=…` | retirer un message | admin |
+| `GET /api/dispatches` | la bande, sources comprises | public |
+| `POST /api/dispatches` / `DELETE /api/dispatches?id=…` | ajouter / corriger / retirer une dépêche | admin |
+
+Un message est bilingue : `{ title: { ru, en }, body: { ru, en }, active }`.
+L'utilisateur lit la langue qu'il a choisie (repli sur le russe si la version
+manque). Les brouillons (`active: false`) ne quittent jamais le serveur.
+Stockage : `data/messages.json` et `data/dispatches.json` (mêmes fichiers côté PHP).
 
 ## Deux versions
 
 ### 1. Version Node.js (originale) — `server.js` + `public/`
 - Express + rss-parser + iconv-lite
-- APIs : `/api/me`, `/api/news`, `/api/visit`, `/api/visits`, `/api/health`
+- APIs : `/api/me`, `/api/news`, `/api/visit`, `/api/visits`, `/api/health`,
+  `/api/messages`, `/api/dispatches` (lecture + écriture admin)
 - Authentification : `/api/auth/login|register|me|logout`, tableau de bord `/dashboard.html`
-- Stockage `data/` (visits.json, users.json, sessions.json, dispatches.json, news_cache.json)
+- Stockage `data/` (visits.json, users.json, sessions.json, dispatches.json, messages.json, news_cache.json)
 - `render.yaml` prêt pour Render.com
 
 **Lancer :**
@@ -51,7 +83,7 @@ confidentialite/contacts/informations-juridiques/laboratoire.html
 auth/login.html, auth/register.html, auth/dispatches.html, dashboard.html
 vk.html + log.php                                   (exercice phishing)
 .htaccess                                           (réécritures /api/*)
-api/*.php + api/auth/*.php                          (backend)
+api/*.php + api/auth/*.php                          (backend, dont messages.php et _content.php)
 data/*.json                                         (writable : 777 data/, 666 fichiers)
 ```
 

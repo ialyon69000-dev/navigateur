@@ -14,6 +14,7 @@ RewriteRule ^api/auth/register$ api/auth/register.php [L,QSA]
 RewriteRule ^api/auth/me$ api/auth/me.php [L,QSA]
 RewriteRule ^api/auth/logout$ api/auth/logout.php [L,QSA]
 RewriteRule ^api/dispatches$ api/dispatches.php [L,QSA]
+RewriteRule ^api/messages$ api/messages.php [L,QSA]
 
 # Prevent direct access to data
 <FilesMatch "^\.ht">

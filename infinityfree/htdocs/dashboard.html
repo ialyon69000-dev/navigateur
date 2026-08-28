@@ -62,6 +62,10 @@
       padding-bottom: 0.45rem;
       border-bottom: 1px solid var(--rule);
     }
+    .dash-section.dash-admin {
+      border-left: 3px solid var(--gold);
+      background: #fbf8f1;
+    }
     .dash-meta {
       font-family: var(--mono);
       font-size: 0.72rem;
@@ -72,9 +76,16 @@
     .dash-meta strong {
       color: var(--ink-2);
     }
+    .dash-hint {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.5;
+      color: var(--mute);
+      margin: -0.35rem 0 1rem;
+    }
     .dash-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 1.2rem;
     }
     .stat-card {
@@ -95,12 +106,16 @@
       font-size: 1.8rem;
       font-weight: 600;
       color: var(--ink);
-      line-height: 1;
+      line-height: 1.1;
       margin: 0 0 0.25rem;
+    }
+    .stat-value.small {
+      font-size: 1.3rem;
     }
     .stat-note {
       font-family: var(--mono);
       font-size: 0.7rem;
+      line-height: 1.4;
       color: var(--mute);
     }
     .stat-card.crimson {
@@ -109,6 +124,182 @@
     .stat-card.gold {
       border-left: 3px solid var(--gold);
     }
+
+    /* ——— les messages de la rédaction, vus par tout le monde ——— */
+    .msg-list {
+      display: grid;
+      gap: 0.9rem;
+    }
+    .msg-card {
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--crimson);
+      background: #fff;
+      padding: 0.85rem 1rem 0.8rem;
+    }
+    .msg-card.is-draft {
+      border-left-color: var(--mute);
+      background: #f6f2e9;
+      opacity: 0.85;
+    }
+    .msg-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.6rem;
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--mute);
+      margin: 0 0 0.4rem;
+    }
+    .msg-badge {
+      border: 1px solid var(--gold);
+      color: var(--crimson-deep);
+      background: rgba(176,137,62,0.1);
+      padding: 0.15em 0.5em;
+      border-radius: 2px;
+      letter-spacing: 0.08em;
+    }
+    .msg-title {
+      font-family: var(--serif);
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--ink);
+      margin: 0 0 0.3rem;
+    }
+    .msg-body {
+      font-family: var(--sans);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      color: var(--ink-2);
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    .msg-by {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--mute);
+      margin: 0.5rem 0 0;
+    }
+
+    /* ——— formulaires d'admin ——— */
+    .dash-form {
+      border-top: 1px dashed var(--rule);
+      margin-top: 1.1rem;
+      padding-top: 1rem;
+    }
+    .dash-form-title {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--crimson-deep);
+      margin: 0 0 0.8rem;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.9rem;
+    }
+    .dash-form label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--mute);
+      margin: 0 0 1rem;
+    }
+    .dash-form input[type="text"],
+    .dash-form textarea {
+      display: block;
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--rule-strong);
+      background: #fff;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      padding: 0.6rem 0.7rem;
+      border-radius: 3px;
+      margin-top: 0.35rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .dash-form textarea {
+      resize: vertical;
+      min-height: 4.6rem;
+    }
+    .dash-form input:focus,
+    .dash-form textarea:focus {
+      outline: none;
+      border-color: var(--crimson);
+      background: #fdfaf3;
+    }
+    .dash-check {
+      display: flex !important;
+      align-items: center;
+      gap: 0.5em;
+      text-transform: none !important;
+      letter-spacing: 0.04em !important;
+      font-size: 0.78rem !important;
+      color: var(--ink-2) !important;
+      margin: 0 0 0.9rem !important;
+    }
+    .dash-check input {
+      width: auto;
+      accent-color: var(--crimson);
+      margin: 0;
+    }
+    .form-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .form-status {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--mute);
+      margin-left: auto;
+    }
+    .form-status.ok { color: #1f6b3a; }
+    .form-status.err { color: var(--crimson); }
+    .admin-list {
+      list-style: none;
+      margin: 1.1rem 0 0;
+      padding: 0;
+      border-top: 1px solid var(--rule);
+    }
+    .admin-list li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--rule);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      color: var(--ink-2);
+    }
+    .admin-list li:last-child { border-bottom: none; }
+    .admin-list .al-title {
+      flex: 1 1 240px;
+      font-family: var(--sans);
+      font-size: 0.86rem;
+      color: var(--ink);
+    }
+    .admin-list .al-state {
+      color: var(--mute);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.64rem;
+    }
+    .admin-list .al-state.off { color: var(--crimson-deep); }
+
     .disp-table {
       width: 100%;
       border-collapse: collapse;
@@ -151,6 +342,12 @@
       font-size: 0.8rem;
       margin: 1rem 0 0;
     }
+    .dash-empty.is-error {
+      color: var(--crimson-deep);
+      border-left: 3px solid var(--crimson);
+      background: rgba(158,27,27,0.05);
+      padding: 0.6rem 0.8rem;
+    }
     .dash-footer {
       margin-top: 1.5rem;
       display: flex;
@@ -158,6 +355,7 @@
     }
     .btn {
       appearance: none;
+      -webkit-appearance: none;
       border: 1px solid var(--crimson);
       background: transparent;
       color: var(--crimson);
@@ -180,6 +378,57 @@
       font-style: normal;
       color: var(--gold-soft);
       margin-right: 0.25rem;
+    }
+    .btn:hover i { color: var(--gold-soft); }
+    .btn[disabled] {
+      opacity: 0.55;
+      cursor: progress;
+    }
+    .btn-solid {
+      background: var(--crimson);
+      color: var(--ivory);
+    }
+    .btn-solid:hover {
+      background: var(--crimson-deep);
+    }
+    .btn-ghost {
+      border-color: var(--rule);
+      color: var(--ink-2);
+    }
+    .btn-ghost:hover {
+      background: var(--rule);
+      color: var(--ink);
+    }
+    .btn-mini {
+      border: 1px solid var(--rule);
+      background: transparent;
+      color: var(--ink-2);
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.3em 0.6em;
+      border-radius: 2px;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .btn-mini:hover {
+      border-color: var(--crimson);
+      color: var(--crimson);
+      background: rgba(158,27,27,0.06);
+    }
+    .btn-mini.danger:hover {
+      border-color: var(--crimson);
+      background: var(--crimson);
+      color: var(--ivory);
+    }
+    /* Ce que la rédaction seule doit voir : masqué tant que le rôle n'est pas
+       confirmé, et retiré du DOM si l'utilisateur est un simple lecteur. */
+    .admin-only { display: none; }
+    .admin-only.is-admin { display: block; }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-status { margin-left: 0; width: 100%; }
     }
   </style>
 </head>
@@ -213,30 +462,74 @@
       <h3 id="stats-title" data-i18n="dash.stats">Статистика редакции</h3>
       <div class="dash-meta">
         <strong>ID:</strong> <span id="dash-id">—</span> ·
-        <strong>Создан:</strong> <span id="dash-created">—</span>
+        <strong data-i18n="dash.created">Создан:</strong> <time id="dash-created">—</time>
       </div>
       <div class="dash-grid">
+        <div class="stat-card gold">
+          <p class="stat-label" data-i18n="dash.stat-role">Роль</p>
+          <p class="stat-value small" id="stat-role">—</p>
+          <p class="stat-note" id="stat-role-note">—</p>
+        </div>
         <div class="stat-card crimson">
+          <p class="stat-label" data-i18n="dash.stat-messages">Сообщения</p>
+          <p class="stat-value" id="stat-messages">0</p>
+          <p class="stat-note" data-i18n="dash.stat-messages-note">Опубликовано редакцией</p>
+        </div>
+        <div class="stat-card gold admin-only" id="stat-card-flux">
           <p class="stat-label" data-i18n="dash.stat-dispatches">Депеши</p>
           <p class="stat-value" id="stat-dispatches">0</p>
           <p class="stat-note" data-i18n="dash.stat-dispatches-note">В архиве личной рассылки</p>
         </div>
-        <div class="stat-card gold">
-          <p class="stat-label" data-i18n="dash.stat-role">Роль</p>
-          <p class="stat-value" id="stat-role">—</p>
-          <p class="stat-note" data-i18n="dash.stat-role-note">Права доступа</p>
-        </div>
       </div>
     </section>
 
-    <section class="dash-section" aria-labelledby="disp-title">
-      <h3 id="disp-title" data-i18n="dash.dispatches-title">Депеши</h3>
+    <section class="dash-section" aria-labelledby="msg-title">
+      <h3 id="msg-title" data-i18n="dash.messages-title">Сообщения редакции</h3>
+      <p class="dash-hint" data-i18n="dash.messages-hint">Только тексты редакции: источники ленты здесь не показываются.</p>
+      <div class="msg-list" id="msg-list"></div>
+      <p class="dash-empty" id="msg-empty" data-i18n="dash.messages-empty">Пока нет сообщений от редакции.</p>
+    </section>
+
+    <section class="dash-section dash-admin admin-only" id="sec-msg-admin" aria-labelledby="msg-admin-title">
+      <h3 id="msg-admin-title" data-i18n="dash.msg-admin-title">Публикация сообщений</h3>
+      <p class="dash-hint" data-i18n="dash.msg-admin-sub">Что видят читатели в личном кабинете…</p>
+
+      <form class="dash-form" id="msg-form" autocomplete="off">
+        <p class="dash-form-title" id="msg-form-title">Новое сообщение</p>
+        <div class="form-grid">
+          <label for="msg-title-ru"><span data-i18n="dash.msg-f-title-ru">Заголовок — русский</span>
+            <input type="text" id="msg-title-ru" name="title-ru" maxlength="160" />
+          </label>
+          <label for="msg-title-en"><span data-i18n="dash.msg-f-title-en">Заголовок — английский</span>
+            <input type="text" id="msg-title-en" name="title-en" maxlength="160" />
+          </label>
+        </div>
+        <label for="msg-body-ru"><span data-i18n="dash.msg-f-body-ru">Текст — русский</span>
+          <textarea id="msg-body-ru" name="body-ru" rows="3" maxlength="1400"></textarea>
+        </label>
+        <label for="msg-body-en"><span data-i18n="dash.msg-f-body-en">Текст — английский</span>
+          <textarea id="msg-body-en" name="body-en" rows="3" maxlength="1400"></textarea>
+        </label>
+        <label class="dash-check" for="msg-active">
+          <input type="checkbox" id="msg-active" name="active" checked />
+          <span data-i18n="dash.msg-f-active">Показать читателям</span>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-solid" id="msg-submit"><i>✦</i> <span data-i18n="dash.msg-save">Сохранить</span></button>
+          <button type="button" class="btn btn-ghost" id="msg-reset"><span data-i18n="dash.msg-reset">Новое сообщение</span></button>
+          <p class="form-status" id="msg-status" role="status"></p>
+        </div>
+      </form>
+
+      <ul class="admin-list" id="msg-admin-list"></ul>
+    </section>
+
+    <section class="dash-section dash-admin admin-only" id="sec-flux" aria-labelledby="disp-title">
+      <h3 id="disp-title" data-i18n="dash.flux-title">Лента и её источники</h3>
+      <p class="dash-hint" data-i18n="dash.flux-sub">Видно только редакции.</p>
       <div class="dash-meta">
         <span data-i18n="dash.updated">Обновлено:</span>
-        <time id="disp-updated">—</time>
-        <span data-i18n="dash.items"> — </span>
-        <span id="disp-count">0</span>
-        <span data-i18n="dash.items-total"> заявок</span>
+        <time id="disp-updated">—</time><span data-i18n="dash.items"> — </span><span id="disp-count">0</span><span data-i18n="dash.items-total"> заявок</span>
       </div>
       <table class="disp-table">
         <thead>
@@ -245,11 +538,43 @@
             <th data-i18n="dash.th-source">Источник</th>
             <th data-i18n="dash.th-title">Заголовок</th>
             <th data-i18n="dash.th-time">Время (МСК)</th>
+            <th aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody id="disp-body"></tbody>
       </table>
       <p class="dash-empty" id="disp-empty">Нет депешей в архиве.</p>
+
+      <form class="dash-form" id="flux-form" autocomplete="off">
+        <p class="dash-form-title" id="flux-form-title">Новая депеша</p>
+        <div class="form-grid">
+          <label for="flux-cat"><span data-i18n="dash.flux-f-cat">Раздел</span>
+            <input type="text" id="flux-cat" name="cat" maxlength="60" />
+          </label>
+          <label for="flux-source"><span data-i18n="dash.flux-f-source">Источник (название редакции)</span>
+            <input type="text" id="flux-source" name="source" maxlength="60" />
+          </label>
+        </div>
+        <label for="flux-title"><span data-i18n="dash.flux-f-title">Заголовок</span>
+          <input type="text" id="flux-title" name="title" maxlength="240" />
+        </label>
+        <label for="flux-summary"><span data-i18n="dash.flux-f-summary">Кратко</span>
+          <textarea id="flux-summary" name="summary" rows="2" maxlength="900"></textarea>
+        </label>
+        <div class="form-grid">
+          <label for="flux-link"><span data-i18n="dash.flux-f-link">Ссылка</span>
+            <input type="text" id="flux-link" name="link" maxlength="400" />
+          </label>
+          <label for="flux-image"><span data-i18n="dash.flux-f-image">Картинка — URL</span>
+            <input type="text" id="flux-image" name="image" maxlength="400" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-solid" id="flux-submit"><i>✦</i> <span data-i18n="dash.flux-add">Добавить в ленту</span></button>
+          <button type="button" class="btn btn-ghost" id="flux-reset"><span data-i18n="dash.flux-reset">Новая депеша</span></button>
+          <p class="form-status" id="flux-status" role="status"></p>
+        </div>
+      </form>
     </section>
 
     <div class="dash-footer">

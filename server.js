@@ -831,7 +831,10 @@ app.get("/api/auth/me", (req, res) => {
   if (!user) {
     return res.json({ ok: false, user: null });
   }
-  res.json({ ok: true, user: { id: user.id, login: user.login, role: user.role } });
+  res.json({
+    ok: true,
+    user: { id: user.id, login: user.login, role: user.role, createdAt: user.createdAt || null },
+  });
 });
 
 app.get("/api/auth/challenge", (req, res) => {
@@ -949,27 +952,275 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
-// ——— Static dispatches ———
+// ——— Contenu éditorial : la bande (flux) et les messages de la rédaction ———
+//
+// Deux publics, deux droits :
+//   • editor  = rôle administrateur du projet : il gère la bande (les flux,
+//     leurs sources) ET les messages affichés aux utilisateurs ;
+//   • reader  = utilisateur : il ne voit que les messages publiés par la
+//     rédaction. Les dépêches, leurs sources et leurs liens ne transitent
+//     jamais vers son tableau de bord (voir public/dashboard.js).
+//
+// Les libellés de rôle ne sont pas renvoyés par le serveur : le client traduit
+// « reader » / « editor » lui-même (window.OKNO.roleLabel).
 const DISPATCHES_FILE = path.join(DATA_DIR, "dispatches.json");
+const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
+const ADMIN_ROLES = new Set(["editor", "admin"]);
+const MAX_MESSAGES = 80;
+const MAX_DISPATCHES = 200;
 
-function readDispatches() {
-  if (!fs.existsSync(DISPATCHES_FILE)) return [];
+function isAdminUser(user) {
+  return !!user && ADMIN_ROLES.has(String(user.role || "reader").toLowerCase());
+}
+
+// Écriture atomique commune aux deux fichiers de contenu.
+function writeJsonFile(file, data) {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = file + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, file);
+}
+
+function readJsonFile(file) {
+  if (!fs.existsSync(file)) return [];
   try {
-    const raw = fs.readFileSync(DISPATCHES_FILE, "utf8");
-    const data = JSON.parse(raw);
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
 }
 
+function readDispatches() {
+  return readJsonFile(DISPATCHES_FILE);
+}
+
+function readMessages() {
+  return readJsonFile(MESSAGES_FILE);
+}
+
+// ——— Sanitisation ———
+function clampText(v, max) {
+  if (v === null || v === undefined) return "";
+  const s = String(v).replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+// Un champ bilingue accepte { ru, en } ou une chaîne simple : une valeur isolée
+// est rangée en « ru », le client retombant sur l'autre langue si une manque.
+function clampLang(v, max) {
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    return { ru: clampText(v.ru, max), en: clampText(v.en, max) };
+  }
+  const s = clampText(v, max);
+  return { ru: s, en: "" };
+}
+
+// Un des deux textes seulement suffit : la version de secours est l'autre langue.
+function hasText(field) {
+  return !!(field && (field.ru || field.en));
+}
+
+function safeUrl(v, max) {
+  const s = clampText(v, max);
+  if (!s || s === "#") return s || null;
+  if (!/^(https?:)?\/\//i.test(s) && !s.startsWith("/")) return null;
+  return s;
+}
+
+function safeIsoDate(v) {
+  const s = clampText(v, 40);
+  const t = s ? Date.parse(s) : NaN;
+  return Number.isNaN(t) ? new Date().toISOString() : new Date(t).toISOString();
+}
+
+/**
+ * Message : champs reconstruits à partir de l'existant quand une requête n'en
+ * porte qu'une partie (c'est le cas de « publier / retirer »).
+ */
+function sanitizeMessage(input, existing) {
+  const base = existing || {};
+  return {
+    title: clampLang(input.title !== undefined ? input.title : base.title, 160),
+    body: clampLang(input.body !== undefined ? input.body : base.body, 1400),
+    active: input.active !== undefined ? input.active !== false && input.active !== "false" : base.active !== false,
+    author: clampText(input.author !== undefined ? input.author : base.author, 40),
+  };
+}
+
+function sanitizeDispatch(input, existing) {
+  const base = existing || {};
+  const pick = (key, max) => clampText(input[key] !== undefined ? input[key] : base[key], max);
+  const out = {
+    category: pick("category", 60),
+    source: pick("source", 60),
+    sourceId: pick("sourceId", 40).toLowerCase().replace(/[^a-z0-9._-]/g, "") || null,
+    title: pick("title", 240),
+    summary: pick("summary", 900),
+    link: safeUrl(input.link !== undefined ? input.link : base.link, 400),
+    image: safeUrl(input.image !== undefined ? input.image : base.image, 400),
+    publishedAt:
+      input.publishedAt !== undefined
+        ? safeIsoDate(input.publishedAt)
+        : clampText(base.publishedAt, 40) || new Date().toISOString(),
+  };
+  if (!out.sourceId && out.source) {
+    out.sourceId = out.source.toLowerCase().replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || null;
+  }
+  return out;
+}
+
+/** Garde d'écriture : session valide + rôle administrateur. */
+function requireAdmin(req, res, next) {
+  const user = sessionUser(req);
+  if (!user) {
+    res.status(401).json({ ok: false, code: "auth-required", error: "Войдите в редакцию, чтобы менять содержимое." });
+    return;
+  }
+  if (!isAdminUser(user)) {
+    res.status(403).json({ ok: false, code: "admin-required", error: "Только редакция может менять ленту и сообщения." });
+    return;
+  }
+  req.oknoUser = user;
+  next();
+}
+
+function writeContent(res, file, list, payload) {
+  try {
+    writeJsonFile(file, list);
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      code: "write-failed",
+      error: "Сервер не может записать data/: проверьте права (chmod 777 data/, 666 data/*.json).",
+      detail: String((err && err.message) || err),
+    });
+    return false;
+  }
+  res.json(Object.assign({ ok: true, updatedAt: new Date().toISOString() }, payload || {}));
+  return true;
+}
+
+const newContentId = (prefix) =>
+  prefix + "_" + Date.now().toString(36) + "_" + crypto.randomBytes(3).toString("hex");
+
+// ——— Messages de la rédaction (ce que voient les utilisateurs) ———
+app.get("/api/messages", (req, res) => {
+  let items = readMessages();
+  // Les brouillons ne sortent que pour la rédaction.
+  if (!(req.query.all === "1" && isAdminUser(sessionUser(req)))) {
+    items = items.filter((m) => m.active !== false);
+  }
+  items = items
+    .slice()
+    .sort((a, b) => Date.parse(b.updatedAt || b.createdAt || 0) - Date.parse(a.updatedAt || a.createdAt || 0));
+  res.json({ updatedAt: new Date().toISOString(), items });
+});
+
+app.post("/api/messages", requireAdmin, (req, res) => {
+  const body = req.body || {};
+  const items = readMessages();
+  const id = clampText(body.id, 40);
+  const idx = id ? items.findIndex((m) => m.id === id) : -1;
+  // un id inconnu n'est jamais une création déguisée
+  if (id && idx < 0) {
+    res.status(404).json({ ok: false, code: "not-found", error: "Сообщение не найдено." });
+    return;
+  }
+  const next = sanitizeMessage(body, idx >= 0 ? items[idx] : null);
+  if (!hasText(next.title)) {
+    res.status(400).json({ ok: false, code: "title-required", error: "Заполните заголовок хотя бы на одном языке." });
+    return;
+  }
+  // L'auteur est toujours un login de session, jamais une valeur du client.
+  next.author = clampText(idx >= 0 ? items[idx].author : "", 40) || req.oknoUser.login;
+  if (idx >= 0) {
+    items[idx] = Object.assign({}, next, { id: items[idx].id, createdAt: items[idx].createdAt, updatedAt: new Date().toISOString() });
+  } else {
+    items.unshift(
+      Object.assign({}, next, { id: newContentId("m"), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    );
+  }
+  writeContent(res, MESSAGES_FILE, items.slice(0, MAX_MESSAGES), { items: items.slice(0, MAX_MESSAGES) });
+});
+
+app.delete("/api/messages", requireAdmin, (req, res) => {
+  const id = clampText((req.body && req.body.id) || req.query.id, 40);
+  const items = readMessages();
+  const next = items.filter((m) => m.id !== id);
+  if (next.length === items.length) {
+    res.status(404).json({ ok: false, code: "not-found", error: "Сообщение не найдено." });
+    return;
+  }
+  writeContent(res, MESSAGES_FILE, next, { removed: id, items: next });
+});
+
+// ——— La bande (les flux préparés par la rédaction) ———
 app.get("/api/dispatches", (req, res) => {
-  const dispatches = readDispatches();
+  const dispatches = readDispatches()
+    .slice()
+    .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
   res.json({ updatedAt: new Date().toISOString(), items: dispatches });
 });
 
+app.post("/api/dispatches", requireAdmin, (req, res) => {
+  const body = req.body || {};
+  const items = readDispatches();
+  const id = clampText(body.id, 40);
+  const idx = id ? items.findIndex((d) => d.id === id) : -1;
+  if (id && idx < 0) {
+    res.status(404).json({ ok: false, code: "not-found", error: "Депеша не найдена." });
+    return;
+  }
+  const next = sanitizeDispatch(body, idx >= 0 ? items[idx] : null);
+  if (!next.title) {
+    res.status(400).json({ ok: false, code: "title-required", error: "Заполните заголовок депеши." });
+    return;
+  }
+  if (idx >= 0) {
+    items[idx] = Object.assign({}, next, { id: items[idx].id });
+  } else {
+    items.unshift(Object.assign({}, next, { id: newContentId("d") }));
+  }
+  writeContent(res, DISPATCHES_FILE, items.slice(0, MAX_DISPATCHES), { items: items.slice(0, MAX_DISPATCHES) });
+});
+
+app.delete("/api/dispatches", requireAdmin, (req, res) => {
+  const id = clampText((req.body && req.body.id) || req.query.id, 40);
+  const items = readDispatches();
+  const next = items.filter((d) => d.id !== id);
+  if (next.length === items.length) {
+    res.status(404).json({ ok: false, code: "not-found", error: "Депеша не найдена." });
+    return;
+  }
+  writeContent(res, DISPATCHES_FILE, next, { removed: id, items: next });
+});
+
+// Message d'accueil de la rédaction : écrit une seule fois, à l'installation.
+function ensureContentFiles() {
+  ensureDataFile();
+  if (!fs.existsSync(DISPATCHES_FILE)) writeJsonFile(DISPATCHES_FILE, []);
+  if (!fs.existsSync(MESSAGES_FILE)) {
+    writeJsonFile(MESSAGES_FILE, [
+      {
+        id: "m_welcome",
+        title: { ru: "Личный кабинет открыт", en: "Your dashboard is open" },
+        body: {
+          ru: "Редакция публикует здесь сообщения для читателей. Источники ленты остаются внутри редакции.",
+          en: "The newsroom posts its notes for readers here. The feed sources stay inside the newsroom.",
+        },
+        active: true,
+        author: "okno",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
+  }
+}
+
 ensureDataFile();
 ensureAuthFile();
+ensureContentFiles();
 
 if (require.main === module) {
   loadNews(true).catch(() => {});

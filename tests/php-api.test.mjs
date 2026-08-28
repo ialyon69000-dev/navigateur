@@ -33,7 +33,11 @@ if (!runner.request) {
     // ——— challenge : sel du compte seed ———
     const chalSeed = await runner.request("api/auth/challenge.php", { query: { login: "okno" } });
     assert.equal(chalSeed.status, 200);
-    assert.equal(JSON.parse(chalSeed.body).salt, "okno-2026");
+    // le sel attendu est lu dans le fichier seed lui-même : les deux versions
+    // (Node et PHP) partagent le même compte, mais le sel vit dans data/users.json
+    const seedUser = JSON.parse(await runner.read("data/users.json")).find((u) => u.login === "okno");
+    assert.ok(seedUser, "le compte seed « okno » est présent dans data/users.json");
+    assert.equal(JSON.parse(chalSeed.body).salt, seedUser.salt);
 
     // ——— challenge : login inconnu → sel de substitution, pas d'énumération ———
     const chalUnknown = await runner.request("api/auth/challenge.php", { query: { login: "inexistant" } });
@@ -226,6 +230,7 @@ if (runner.request) {
       ["api/me.php", "GET", null],
       ["api/visits.php", "GET", null],
       ["api/dispatches.php", "GET", null],
+      ["api/messages.php", "GET", null],
       ["api/visit.php", "POST", { language: "fr" }],
       ["api/auth/challenge.php", "GET", null],
       ["api/auth/me.php", "GET", null],
@@ -241,5 +246,114 @@ if (runner.request) {
       }, script + " : sortie non JSON → " + res.body.slice(0, 120));
       assert.equal(typeof parsed, "object");
     }
+  });
+}
+
+if (runner.request) {
+  test("messages et bande : mêmes droits que la version Node", async () => {
+    const pwd = "Contenu!2026";
+    const mk = (id, login, role) => {
+      const salt = "salt-" + id;
+      const h1 = clientHash(pwd, salt);
+      return { id, login, hash: nodeSha(h1 + salt), salt, scheme: 2, createdAt: "2026-08-01T00:00:00Z", role, _h1: h1 };
+    };
+    const admin = mk("admin", "okno", "editor");
+    const lectrice = mk("u_read", "claire", "reader");
+    runner.write(
+      "data/users.json",
+      JSON.stringify(
+        [admin, lectrice].map(({ _h1, ...u }) => u),
+        null,
+        2,
+      ),
+    );
+    const sidOf = async (login) => {
+      const r = await runner.request("api/auth/login.php", { method: "POST", body: { login, hash: lectrice._h1 && login === "claire" ? lectrice._h1 : admin._h1 } });
+      assert.equal(r.status, 200, r.body);
+      return "okno-session=" + runner.cookieOf(r, "okno-session");
+    };
+    const adminCookie = await sidOf("okno");
+    const readerCookie = await sidOf("claire");
+
+    // point de départ : le fichier de la rédaction est celui livré dans le dépôt
+    runner.write("data/messages.json", JSON.stringify([
+      { id: "m_1", title: { ru: "Опубликовано", en: "Published" }, body: { ru: "да", en: "yes" }, active: true, author: "okno", createdAt: "2026-08-20T00:00:00Z", updatedAt: "2026-08-20T00:00:00Z" },
+      { id: "m_2", title: { ru: "Черновик", en: "Draft" }, body: { ru: "нет", en: "no" }, active: false, author: "okno", createdAt: "2026-08-21T00:00:00Z", updatedAt: "2026-08-21T00:00:00Z" },
+    ], null, 2));
+
+    // ——— lecture : les lecteurs ne voient que le publié ———
+    const anon = await runner.request("api/messages.php");
+    assert.equal(anon.status, 200, anon.body);
+    assert.deepEqual(JSON.parse(anon.body).items.map((m) => m.id), ["m_1"], "un brouillon ne sort pas");
+
+    const readerAll = await runner.request("api/messages.php", { query: { all: "1" }, cookie: readerCookie });
+    assert.deepEqual(JSON.parse(readerAll.body).items.map((m) => m.id), ["m_1"], "?all=1 ne force rien pour un lecteur");
+    const adminAll = await runner.request("api/messages.php", { query: { all: "1" }, cookie: adminCookie });
+    assert.deepEqual(JSON.parse(adminAll.body).items.map((m) => m.id), ["m_2", "m_1"], "l'admin voit ses brouillons, les plus récents d'abord");
+
+    // ——— écriture : réservée à la rédaction ———
+    const noSession = await runner.request("api/messages.php", { method: "POST", body: { title: { ru: "x" } } });
+    assert.equal(noSession.status, 401, noSession.body);
+    assert.equal(JSON.parse(noSession.body).code, "auth-required");
+
+    const asReader = await runner.request("api/messages.php", { method: "POST", body: { title: { ru: "x" } }, cookie: readerCookie });
+    assert.equal(asReader.status, 403, asReader.body);
+    assert.equal(JSON.parse(asReader.body).code, "admin-required");
+
+    const created = await runner.request("api/messages.php", {
+      method: "POST",
+      cookie: adminCookie,
+      body: { title: { ru: "Планёрка", en: "Newsroom call" }, body: { ru: "В 18:00", en: "At 18:00" }, active: true, author: "fake" },
+    });
+    assert.equal(created.status, 200, created.body);
+    const saved = JSON.parse(await runner.read("data/messages.json"));
+    const fresh = saved.find((m) => m.title.ru === "Планёрка");
+    assert.ok(fresh && fresh.id.startsWith("m_"), "l'objet est écrit dans data/messages.json");
+    assert.deepEqual(fresh.title, { ru: "Планёрка", en: "Newsroom call" }, "les deux langues sont stockées");
+    assert.equal(fresh.author, "okno", "l'auteur est le login de session, jamais celui du client");
+    assert.equal(saved[0].id, fresh.id, "une nouveauté passe en tête");
+
+    // ——— mise à jour partielle : publier / retirer ne vide pas le texte ———
+    const toggled = await runner.request("api/messages.php", { method: "POST", cookie: adminCookie, body: { id: fresh.id, active: false } });
+    assert.equal(toggled.status, 200, toggled.body);
+    const afterToggle = JSON.parse(await runner.read("data/messages.json")).find((m) => m.id === fresh.id);
+    assert.equal(afterToggle.active, false);
+    assert.deepEqual(afterToggle.title, { ru: "Планёрка", en: "Newsroom call" }, "le titre est conservé");
+
+    const unknown = await runner.request("api/messages.php", { method: "POST", cookie: adminCookie, body: { id: "m_inexistant", active: true } });
+    assert.equal(unknown.status, 404, unknown.body);
+    const empty = await runner.request("api/messages.php", { method: "POST", cookie: adminCookie, body: { title: { ru: "", en: "" } } });
+    assert.equal(empty.status, 400, empty.body);
+    assert.equal(JSON.parse(empty.body).code, "title-required");
+
+    const removed = await runner.request("api/messages.php", { method: "DELETE", query: { id: fresh.id }, cookie: adminCookie });
+    assert.equal(removed.status, 200, removed.body);
+    assert.equal(JSON.parse(await runner.read("data/messages.json")).some((m) => m.id === fresh.id), false, "supprimé du fichier");
+    const removeAgain = await runner.request("api/messages.php", { method: "DELETE", query: { id: fresh.id }, cookie: adminCookie });
+    assert.equal(removeAgain.status, 404, removeAgain.body);
+
+    // ——— la bande : l'admin voit les sources, le lecteur n'écrit pas ———
+    const fluxReader = await runner.request("api/dispatches.php", { method: "POST", cookie: readerCookie, body: { title: "x" } });
+    assert.equal(fluxReader.status, 403, fluxReader.body);
+    const fluxAdd = await runner.request("api/dispatches.php", {
+      method: "POST",
+      cookie: adminCookie,
+      body: { category: "Мир", source: "TASS", title: "Депеша", link: "javascript:alert(1)", image: "https://example.com/a.jpg" },
+    });
+    assert.equal(fluxAdd.status, 200, fluxAdd.body);
+    const flux = JSON.parse(await runner.read("data/dispatches.json"));
+    const added = flux.find((d) => d.title === "Депеша");
+    assert.ok(added && added.id.startsWith("d_"), "la dépêche est ajoutée");
+    assert.equal(added.source, "TASS", "la source est conservée pour la rédaction");
+    assert.equal(added.sourceId, "tass", "un identifiant de source est dérivé");
+    assert.equal(added.link, null, "un lien javascript: est rejeté");
+    assert.match(added.publishedAt, /^\d{4}-\d{2}-\d{2}T/, "date de publication valide");
+
+    const fluxDel = await runner.request("api/dispatches.php", { method: "DELETE", query: { id: added.id }, cookie: adminCookie });
+    assert.equal(fluxDel.status, 200, fluxDel.body);
+
+    // ——— méthode refusée ———
+    const patch = await runner.request("api/messages.php", { method: "PATCH", cookie: adminCookie, body: "{}" });
+    assert.equal(patch.status, 405, patch.body);
   });
 }

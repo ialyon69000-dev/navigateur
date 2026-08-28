@@ -97,28 +97,34 @@
     </li>`;
   }
 
+  // L'utilisateur de la session, pour que le changement de langue puisse
+  // redessiner la pastille sans nouvelle requête réseau.
+  let me = null;
+
   async function loadMe() {
     try {
       const res = await fetch(ME_URL);
       const data = await res.json().catch(() => ({}));
-      const label = $("disp-user-label");
-      if (!label) return;
-
-      if (!data || !data.ok || !data.user) {
-        // гость
-        label.innerHTML = `<span data-i18n="disp.guest">Гость</span>`;
-        return;
-      }
-
-      // пользователь
-      const role = data.user.role === "editor" ? T("dash.role-editor") : T("dash.role-reader");
-      label.innerHTML =
-        `<span data-i18n="disp.visitor-label">Пользователь:</span> <strong style="color:var(--ink)">${escStrict(data.user.login)}</strong> · <span style="color:var(--gold-soft)">${escStrict(role)}</span>`;
-
-      // если есть логин, попробуем добавить ссылку на déconnexion? cette page est publique, on ne déconnecte pas ici.
+      me = data && data.ok && data.user ? data.user : null;
+      renderUserLabel();
     } catch (e) {
       console.error("OKNO me", e);
     }
+  }
+
+  // Le rôle passe par le dictionnaire : « reader »/« editor » ne s'affichent
+  // jamais en russe figé ni en anglais figé, mais selon la langue choisie.
+  function renderUserLabel() {
+    const label = $("disp-user-label");
+    if (!label) return;
+    if (!me) {
+      label.textContent = T("disp.guest");
+      return;
+    }
+    const role = (window.OKNO && window.OKNO.roleLabel ? window.OKNO.roleLabel(me.role) : String(me.role || ""));
+    label.innerHTML =
+      `<span>${escStrict(T("disp.visitor-label"))}</span> <strong style="color:var(--ink)">${escStrict(me.login)}</strong>` +
+      ` · <span style="color:var(--gold-soft)">${escStrict(role)}</span>`;
   }
 
   function escStrict(s) {
@@ -158,6 +164,12 @@
   }
 
   function boot() {
+    if (window.OKNO) {
+      window.OKNO.onLangChange = () => {
+        renderUserLabel();
+        loadDispatches();
+      };
+    }
     loadMe();
     loadDispatches();
   }

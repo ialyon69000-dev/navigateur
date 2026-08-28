@@ -717,8 +717,10 @@
     if (user) {
       const esc = (s) =>
         String(s || "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+      // Le rôle est traduit par le dictionnaire (reader/editor), jamais par le serveur.
+      const role = window.OKNO && window.OKNO.roleLabel ? esc(window.OKNO.roleLabel(user.role)) : "";
       zone.innerHTML =
-        `<span class="auth-user">${T("authzone.user", esc(user.login))}</span>` +
+        `<span class="auth-user">${T("authzone.user", esc(user.login))}${role ? " · " + role : ""}</span>` +
         sep +
         `<a href="/dashboard.html" data-i18n="authzone.dashboard">${T("authzone.dashboard")}</a>` +
         sep +
