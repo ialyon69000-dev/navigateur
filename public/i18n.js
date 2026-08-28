@@ -333,6 +333,8 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "auth.password-short": { ru: "Пароль от 6 знаков.", en: "Password must be at least 6 characters." },
     "auth.login-short": { ru: "Логин от 3 знаков.", en: "Login must be at least 3 characters." },
     "auth.loading": { ru: "Загрузка…", en: "Loading…" },
+    "auth.network-error": { ru: "Сервер недоступен. Проверьте соединение и попробуйте снова.", en: "Server unreachable. Check your connection and try again." },
+    "auth.not-json": { ru: "Сервер вернул HTML вместо JSON (защита хостинга или устаревшие файлы api/auth/). Перезагрузите страницу и попробуйте снова.", en: "The server returned HTML instead of JSON (hosting protection or outdated api/auth/ files). Reload the page and try again." },
 
     // register
     "register.title": { ru: "Создать логин", en: "Create an account" },

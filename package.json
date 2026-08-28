@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test --test-force-exit tests/*.test.mjs",
+    "test:php": "node --test --test-force-exit tests/php-api.test.mjs"
   },
   "engines": {
     "node": ">=18"

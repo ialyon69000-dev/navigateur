@@ -2,6 +2,24 @@
 
 Projet pédagogique : unes des médias russes + démonstration empreinte navigateur.
 
+## Connexion (identique dans les deux versions)
+
+Le mot de passe **ne quitte jamais le navigateur** :
+
+1. `GET /api/auth/challenge?login=x` → le serveur donne le sel du compte ;
+2. le navigateur envoie `sha256(mot_de_passe + sel)` (Web Crypto, ou SHA-256 en
+   JS pur si la page est en `http://` simple) ;
+3. le serveur stocke `sha256( sha256(mot_de_passe + sel) + sel )` et pose un
+   cookie de session `okno-session` (HttpOnly, SameSite=Lax).
+
+Un corps de requête contenant un champ `password` est refusé (HTTP 400) et les
+comptes de l'ancien schéma sont migrés au premier login. Réinitialiser un mot de
+passe : `node scripts/auth-user.mjs <login> <mot_de_passe> --role editor`.
+
+```bash
+npm test   # sha256 de repli, auth.js, API PHP de bout en bout, API Node
+```
+
 ## Deux versions
 
 ### 1. Version Node.js (originale) — `server.js` + `public/`
