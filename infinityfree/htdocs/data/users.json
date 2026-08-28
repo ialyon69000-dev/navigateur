@@ -2,9 +2,10 @@
   {
     "id": "admin",
     "login": "okno",
-    "hash": "e8c087e2021084b171a252308d2b2f6435847f084e20255bc0e0c55cd6f7155d",
-    "salt": "okno-2026",
-    "createdAt": "2026-08-27T00:00:00Z",
+    "hash": "65a43968505e5d3505e9695a35a5e09ce4ce49948d1386304c28af4312d9cc99",
+    "salt": "2b5a1d5cd241e1c0",
+    "scheme": 2,
+    "createdAt": "2026-08-28T16:32:08.429Z",
     "role": "editor"
   }
 ]
