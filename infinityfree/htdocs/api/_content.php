@@ -124,8 +124,8 @@ function content_sanitize_dispatch($in, $base) {
         'category' => $pick('category', 60),
         'source' => $pick('source', 60),
         'sourceId' => preg_replace('/[^a-z0-9._-]/', '', strtolower($pick('sourceId', 40))) ?: null,
-        'title' => $pick('title', 240),
-        'summary' => $pick('summary', 900),
+        'title' => content_lang(array_key_exists('title', $in) ? $in['title'] : ($base['title'] ?? null), 240),
+        'summary' => content_lang(array_key_exists('summary', $in) ? $in['summary'] : ($base['summary'] ?? null), 900),
         'link' => content_safe_url(array_key_exists('link', $in) ? $in['link'] : ($base['link'] ?? null), 400),
         'image' => content_safe_url(array_key_exists('image', $in) ? $in['image'] : ($base['image'] ?? null), 400),
         'publishedAt' => array_key_exists('publishedAt', $in)

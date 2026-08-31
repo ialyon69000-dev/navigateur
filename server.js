@@ -1055,8 +1055,11 @@ function sanitizeDispatch(input, existing) {
     category: pick("category", 60),
     source: pick("source", 60),
     sourceId: pick("sourceId", 40).toLowerCase().replace(/[^a-z0-9._-]/g, "") || null,
-    title: pick("title", 240),
-    summary: pick("summary", 900),
+    // Conserver les deux versions quand elles sont fournies par l'éditeur.
+    // Une chaîne historique est rangée en russe et reste compatible avec le
+    // repli de l'interface.
+    title: clampLang(input.title !== undefined ? input.title : base.title, 240),
+    summary: clampLang(input.summary !== undefined ? input.summary : base.summary, 900),
     link: safeUrl(input.link !== undefined ? input.link : base.link, 400),
     image: safeUrl(input.image !== undefined ? input.image : base.image, 400),
     publishedAt:

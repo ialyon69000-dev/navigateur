@@ -377,13 +377,22 @@
     return `<div class="${cls}" data-source="${escAttr(item.sourceId)}"><span class="thumb-ph">${letter}</span>${img}</div>`;
   }
 
+  // Les dépêches peuvent être anciennes (chaînes simples) ou bilingues
+  // ({ru, en}). Toujours passer par loc() afin que le changement de langue
+  // s'applique aussi au contenu injecté après le chargement de la page.
+  function loc(field) {
+    return window.OKNO && typeof window.OKNO.loc === "function"
+      ? window.OKNO.loc(field)
+      : (typeof field === "object" ? (field.ru || field.en || "") : (field || ""));
+  }
+
   function fillText(root, selector, text) {
     const el = root.querySelector(selector);
-    if (el) el.textContent = text || "";
+    if (el) el.textContent = loc(text);
   }
 
   function rubricOf(item) {
-    const t = `${item.category || ""} ${item.title || ""}`.toLowerCase();
+    const t = `${loc(item.category)} ${loc(item.title)}`.toLowerCase();
     if (/спорт|футбол|хоккей|матч|гол|чемпионат|олимп/.test(t)) return "sport";
     if (/экономик|бизнес|рынок|банк|нефть|рубл|компани/.test(t)) return "economie";
     if (/культур|театр|кино|музык|книг|ценност|фильм/.test(t)) return "culture";
@@ -528,7 +537,7 @@
            ${hero.image ? `<img class="hero-photo" src="${escAttr(hero.image)}" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
            <div class="hero-shade"></div>
            <div class="hero-copy">
-             <span class="badge">${hero.source}${hero.category ? " · " + hero.category : ""}</span>
+             <span class="badge">${hero.source}${loc(hero.category) ? " · " + loc(hero.category) : ""}</span>
              <h2 data-title></h2>
              <p class="hero-sum" data-sum></p>
              <span class="meta">${timeAgo(hero.publishedAt)}</span>
@@ -583,7 +592,7 @@
           it,
           "band-card",
           `${thumbHtml(it, "card-img")}
-           <span class="badge">${it.category || it.source}</span>
+           <span class="badge">${loc(it.category) || it.source}</span>
            <h3 data-title></h3>
            <p class="meta">${it.source} · ${timeAgo(it.publishedAt)}</p>`
         )
@@ -688,8 +697,8 @@
         if (result.status !== "fulfilled" || !result.value) continue;
         const items = Array.isArray(result.value.items) ? result.value.items : [];
         for (const item of items) {
-          const key = String(item.title || "").toLowerCase().slice(0, 120);
-          if (!key || seen.has(key) || isBrokenTitle(item.title)) continue;
+          const key = loc(item.title).toLowerCase().slice(0, 120);
+          if (!key || seen.has(key) || isBrokenTitle(loc(item.title))) continue;
           seen.add(key);
           merged.push(item);
         }
