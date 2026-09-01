@@ -51,6 +51,69 @@ L'utilisateur lit la langue qu'il a choisie (repli sur le russe si la version
 manque). Les brouillons (`active: false`) ne quittent jamais le serveur.
 Stockage : `data/messages.json` et `data/dispatches.json` (mêmes fichiers côté PHP).
 
+## Synthèse des visiteurs (`data/visits.json`)
+
+`visits.json` n'est plus un simple tableau : le fichier porte désormais la
+synthèse des clients qui consultent le site, recalculée à chaque écriture à
+partir des **seules** données déjà envoyées par le navigateur (aucune collecte
+supplémentaire, aucun cookie de suivi).
+
+```jsonc
+{
+  "generatedAt": "2026-09-01T20:19:42.700Z",
+  "summary": {                 // vue d'ensemble
+    "totalVisits": 42, "uniqueClients": 17,
+    "returningClients": 6, "newClients": 11,
+    "returningRate": 0.353, "visitsPerClient": 2.47, "activeDays": 5,
+    "firstVisitAt": "…", "lastVisitAt": "…",
+    "gpsShared": 1, "automated": 0,
+    "topCountries": [{ "value": "Russia", "count": 9 }],
+    "topCities": [], "topDevices": [], "topBrowsers": [], "topSystems": [],
+    "topLanguages": [], "topTimezones": [], "topReferrers": [],
+    "visitsByHourUTC": [{ "value": "20h", "count": 4 }]
+  },
+  "clients": [                 // une fiche par visiteur
+    {
+      "clientId": "c_33baca6a20fcf988",
+      "visits": 3, "distinctDays": 2, "returning": true,
+      "firstSeen": "…", "lastSeen": "…", "daysBetweenFirstAndLast": 1.2,
+      "ip": "203.0.113.4",
+      "place": { "city": "Moscow", "region": "…", "country": "Russia", "isp": "…" },
+      "device": { "type": "desktop", "os": "Windows 10/11", "browser": "Chrome 120",
+                  "screen": "1920×1080", "gpu": "…", "cores": 8, "memoryGB": 8, "touch": false },
+      "preferences": { "language": "ru", "timezone": "Europe/Moscow",
+                       "colorScheme": "dark", "keyboardLayout": "…" },
+      "network": { "effectiveType": "4g", "downlink": 10, "rtt": 50 },
+      "privacy": { "cookiesEnabled": true, "globalPrivacyControl": false,
+                   "consent": true, "automated": false },
+      "referrers": [{ "value": "https://ya.ru/", "count": 2 }],
+      "gpsShared": false,
+      "visitIds": ["v_…"]
+    }
+  ],
+  "visits": [ /* le journal brut, inchangé */ ]
+}
+```
+
+Le regroupement s'appuie sur une **empreinte stable recalculée** (IP, système,
+navigateur, type d'appareil, écran, langue, fuseau, GPU, cœurs, mémoire) hachée
+en `c_…` : deux passages du même poste comptent pour un seul client, sans
+identifiant persistant déposé chez l'internaute.
+
+Compatibilité : un ancien `visits.json` (tableau brut) est toujours lu, et la
+synthèse est reconstruite à la première écriture.
+
+| Route | Effet |
+|-------|-------|
+| `GET /api/visits` | journal + `summary` + `clients` |
+| `GET /api/visits/summary` (PHP : `api/visits.php?summary=1`) | synthèse seule, sans le journal |
+| `POST /api/visit` | enregistre la visite et renvoie la `summary` à jour |
+| `DELETE /api/visits` | vide le journal et remet la synthèse à zéro |
+
+La page **Лаборатория / Laboratory** affiche cette synthèse : cartes de
+totaux, classements (pays, appareils, navigateurs, systèmes, langues,
+référents) et un tableau des clients.
+
 ## Deux versions
 
 ### 1. Version Node.js (originale) — `server.js` + `public/`

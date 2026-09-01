@@ -823,6 +823,96 @@
     if (empty) empty.hidden = data.total > 0;
   }
 
+  function renderSummary(data) {
+    const cards = $("summary-cards");
+    const tops = $("summary-tops");
+    const rows = $("client-rows");
+    const dash = T("cell.dash");
+    const s = data.summary || null;
+    const clients = data.clients || [];
+    const fmtDate = (iso) =>
+      iso
+        ? new Intl.DateTimeFormat(dateLocale(), { dateStyle: "short", timeStyle: "short" }).format(new Date(iso))
+        : dash;
+
+    if (cards) {
+      cards.innerHTML = "";
+      if (s) {
+        const items = [
+          [T("sum.clients"), s.uniqueClients],
+          [T("sum.visits"), s.totalVisits],
+          [T("sum.returning"), `${s.returningClients} (${Math.round((s.returningRate || 0) * 100)}%)`],
+          [T("sum.per-client"), s.visitsPerClient],
+          [T("sum.days"), s.activeDays],
+        ];
+        for (const [label, value] of items) {
+          const div = document.createElement("div");
+          div.className = "summary-card";
+          const l = document.createElement("span");
+          l.className = "summary-label";
+          l.textContent = label;
+          const v = document.createElement("strong");
+          v.className = "summary-value";
+          v.textContent = String(value ?? dash);
+          div.append(l, v);
+          cards.appendChild(div);
+        }
+      }
+    }
+
+    if (tops) {
+      tops.innerHTML = "";
+      if (s) {
+        const groups = [
+          [T("sum.countries"), s.topCountries],
+          [T("sum.devices"), s.topDevices],
+          [T("sum.browsers"), s.topBrowsers],
+          [T("sum.systems"), s.topSystems],
+          [T("sum.languages"), s.topLanguages],
+          [T("sum.referrers"), s.topReferrers],
+        ];
+        for (const [label, list] of groups) {
+          if (!list || !list.length) continue;
+          const box = document.createElement("div");
+          box.className = "summary-top";
+          const h = document.createElement("h3");
+          h.textContent = label;
+          const ul = document.createElement("ul");
+          for (const entry of list) {
+            const li = document.createElement("li");
+            li.textContent = `${entry.value} — ${entry.count}`;
+            ul.appendChild(li);
+          }
+          box.append(h, ul);
+          tops.appendChild(box);
+        }
+      }
+    }
+
+    if (rows) {
+      rows.innerHTML = "";
+      for (const c of clients) {
+        const tr = document.createElement("tr");
+        const cells = [
+          c.clientId,
+          String(c.visits),
+          c.returning ? T("client.returning") : T("client.new"),
+          [c.place?.city, c.place?.country].filter(Boolean).join(", ") || dash,
+          [c.device?.type, c.device?.os, c.device?.browser].filter(Boolean).join(" · ") || dash,
+          c.preferences?.language || dash,
+          fmtDate(c.firstSeen),
+          fmtDate(c.lastSeen),
+        ];
+        for (const value of cells) {
+          const td = document.createElement("td");
+          td.textContent = value;
+          tr.appendChild(td);
+        }
+        rows.appendChild(tr);
+      }
+    }
+  }
+
   async function initLab() {
     const pre = $("json-view");
 
@@ -832,6 +922,7 @@
       labData = data;
       if (pre) pre.textContent = JSON.stringify(data.visits, null, 2);
       renderLabTable(data);
+      renderSummary(data);
     }
 
     $("btn-refresh")?.addEventListener("click", refresh);
@@ -855,7 +946,10 @@
         status.textContent = T("record.saved", state.totalVisits);
       }
       if (state.news.length) renderNews(state.news);
-      if (labData) renderLabTable(labData);
+      if (labData) {
+        renderLabTable(labData);
+        renderSummary(labData);
+      }
       if ($("auth-zone")) renderAuthZone();
     };
   }

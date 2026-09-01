@@ -215,7 +215,11 @@ function readVisits() {
   try {
     const raw = fs.readFileSync(VISITS_FILE, "utf8");
     const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    // Format historique : un simple tableau de visites.
+    if (Array.isArray(data)) return data;
+    // Format actuel : { summary, clients, visits }.
+    if (data && Array.isArray(data.visits)) return data.visits;
+    return [];
   } catch {
     return [];
   }
@@ -223,9 +227,24 @@ function readVisits() {
 
 function writeVisits(visits) {
   ensureDataFile();
+  const list = Array.isArray(visits) ? visits : [];
+  const payload = buildVisitsFile(list);
   const tmp = VISITS_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(visits, null, 2) + "\n", "utf8");
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2) + "\n", "utf8");
   fs.renameSync(tmp, VISITS_FILE);
+  return payload;
+}
+
+function readVisitsFile() {
+  ensureDataFile();
+  try {
+    const raw = fs.readFileSync(VISITS_FILE, "utf8");
+    const data = JSON.parse(raw);
+    if (data && !Array.isArray(data) && Array.isArray(data.visits)) return data;
+    return buildVisitsFile(Array.isArray(data) ? data : []);
+  } catch {
+    return buildVisitsFile([]);
+  }
 }
 
 function clientIp(req) {
@@ -745,6 +764,219 @@ function mergeVisit(base, extra) {
   return base;
 }
 
+// ——— Synthèse des visiteurs ———————————————————————————————————————
+// visits.json ne contient plus seulement la liste brute des visites : on y
+// ajoute une fiche par « client » (empreinte stable) et un résumé global, tous
+// deux recalculés à chaque écriture à partir des seules données déjà
+// enregistrées par le navigateur (aucune collecte supplémentaire).
+
+function deviceType(v) {
+  const ua = String(v.userAgent || "");
+  const hints = v.clientHints || {};
+  const isTablet =
+    /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
+    (/Android/i.test(ua) && !/Mobile/i.test(ua)) ||
+    (v.platform === "MacIntel" && Number(v.maxTouchPoints) > 1);
+  if (isTablet) return "tablet";
+  if (hints.mobile === true || /Mobi|iPhone|Android/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
+function browserName(v) {
+  const hints = v.clientHints || {};
+  const brands = [].concat(hints.fullVersionList || [], hints.brands || []);
+  const real = brands.find((b) => !/Not.?A.?Brand/i.test(b) && !/Chromium/i.test(b));
+  if (real) return clampStr(real, 60);
+  const ua = String(v.userAgent || "");
+  if (/Edg\//.test(ua)) return "Edge";
+  if (/OPR\/|Opera/.test(ua)) return "Opera";
+  if (/YaBrowser/.test(ua)) return "Yandex";
+  if (/Firefox\//.test(ua)) return "Firefox";
+  if (/Chrome\//.test(ua)) return "Chrome";
+  if (/Safari\//.test(ua)) return "Safari";
+  return null;
+}
+
+function osName(v) {
+  const hints = v.clientHints || {};
+  if (hints.platform) {
+    return clampStr(hints.platform + (hints.platformVersion ? " " + hints.platformVersion : ""), 60);
+  }
+  return clampStr(v.platform || platformFromUa(v.userAgent), 60);
+}
+
+// Empreinte stable : ce qui ne change pas d'une visite à l'autre pour un même
+// poste (IP, écran, matériel, langue, fuseau, GPU). Ni cookie ni identifiant
+// persistant côté navigateur : la clé est recalculée, jamais stockée en clair.
+function clientKey(v) {
+  const s = v.screen || {};
+  const parts = [
+    v.ip || "",
+    osName(v) || "",
+    browserName(v) || "",
+    deviceType(v),
+    s.width || "",
+    s.height || "",
+    s.colorDepth || "",
+    v.timezone || "",
+    v.language || "",
+    v.hardwareConcurrency || "",
+    v.deviceMemory || "",
+    (v.gpu && v.gpu.renderer) || "",
+  ].join("|");
+  return "c_" + crypto.createHash("sha256").update(parts).digest("hex").slice(0, 16);
+}
+
+function topOf(counter, limit = 5) {
+  return Object.entries(counter)
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+    .slice(0, limit)
+    .map(([value, count]) => ({ value, count }));
+}
+
+function bump(counter, key) {
+  if (key == null || key === "") return;
+  counter[key] = (counter[key] || 0) + 1;
+}
+
+function summarizeClient(visits) {
+  const sorted = visits.slice().sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt));
+  const last = sorted[sorted.length - 1];
+  const first = sorted[0];
+  const geo = last.geoIp || {};
+  const days = new Set(sorted.map((v) => String(v.recordedAt || "").slice(0, 10)).filter(Boolean));
+  const referrers = {};
+  const languages = {};
+  for (const v of sorted) {
+    if (v.referrer) bump(referrers, v.referrer);
+    bump(languages, v.language);
+  }
+  const spanMs = Date.parse(last.recordedAt) - Date.parse(first.recordedAt);
+  return {
+    clientId: clientKey(last),
+    visits: sorted.length,
+    distinctDays: days.size,
+    firstSeen: first.recordedAt || null,
+    lastSeen: last.recordedAt || null,
+    returning: sorted.length > 1,
+    daysBetweenFirstAndLast: Number.isFinite(spanMs) ? Number((spanMs / 86400000).toFixed(2)) : null,
+    ip: last.ip || null,
+    place: {
+      city: geo.city || null,
+      region: geo.region || null,
+      country: geo.country || null,
+      countryCode: geo.countryCode || null,
+      isp: geo.isp || null,
+    },
+    gpsShared: sorted.some((v) => v.geolocation != null),
+    device: {
+      type: deviceType(last),
+      os: osName(last),
+      browser: browserName(last),
+      screen:
+        last.screen && last.screen.width && last.screen.height
+          ? `${last.screen.width}×${last.screen.height}`
+          : null,
+      gpu: (last.gpu && last.gpu.renderer) || null,
+      cores: last.hardwareConcurrency ?? null,
+      memoryGB: last.deviceMemory ?? null,
+      touch: Number(last.maxTouchPoints) > 0,
+    },
+    preferences: {
+      language: last.language || null,
+      languages: Array.isArray(last.languages) ? last.languages : [],
+      timezone: last.timezone || null,
+      colorScheme: (last.theme && last.theme.colorScheme) || null,
+      reducedMotion: (last.theme && last.theme.reducedMotion) ?? null,
+      keyboardLayout: (last.keyboard && last.keyboard.layout) || null,
+    },
+    network: {
+      effectiveType: (last.network && last.network.effectiveType) || null,
+      downlink: (last.network && last.network.downlink) ?? null,
+      rtt: (last.network && last.network.rtt) ?? null,
+      saveData: (last.network && last.network.saveData) ?? null,
+    },
+    privacy: {
+      cookiesEnabled: last.cookiesEnabled ?? null,
+      globalPrivacyControl: last.globalPrivacyControl ?? null,
+      consent: last.consent === true,
+      automated: last.webdriver === true,
+    },
+    referrers: topOf(referrers, 5),
+    languagesSeen: topOf(languages, 5),
+    visitIds: sorted.map((v) => v.id).filter(Boolean).slice(-50),
+  };
+}
+
+function buildVisitsFile(visits) {
+  const list = Array.isArray(visits) ? visits : [];
+  const groups = new Map();
+  for (const v of list) {
+    if (!v || typeof v !== "object") continue;
+    const key = clientKey(v);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(v);
+  }
+  const clients = [...groups.values()]
+    .map(summarizeClient)
+    .sort((a, b) => Date.parse(b.lastSeen || 0) - Date.parse(a.lastSeen || 0));
+
+  const countries = {};
+  const cities = {};
+  const devices = {};
+  const browsers = {};
+  const systems = {};
+  const langs = {};
+  const timezones = {};
+  const referrers = {};
+  const hours = {};
+  for (const c of clients) {
+    bump(countries, c.place.country);
+    bump(cities, [c.place.city, c.place.country].filter(Boolean).join(", "));
+    bump(devices, c.device.type);
+    bump(browsers, c.device.browser);
+    bump(systems, c.device.os);
+    bump(langs, c.preferences.language);
+    bump(timezones, c.preferences.timezone);
+    for (const r of c.referrers) referrers[r.value] = (referrers[r.value] || 0) + r.count;
+  }
+  for (const v of list) {
+    const d = new Date(v.recordedAt);
+    if (!Number.isNaN(d.getTime())) bump(hours, String(d.getUTCHours()).padStart(2, "0") + "h");
+  }
+  const returning = clients.filter((c) => c.returning).length;
+  const stamps = list.map((v) => Date.parse(v.recordedAt)).filter((n) => Number.isFinite(n));
+  const dayKeys = new Set(list.map((v) => String(v.recordedAt || "").slice(0, 10)).filter(Boolean));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalVisits: list.length,
+      uniqueClients: clients.length,
+      returningClients: returning,
+      newClients: clients.length - returning,
+      returningRate: clients.length ? Number((returning / clients.length).toFixed(3)) : 0,
+      visitsPerClient: clients.length ? Number((list.length / clients.length).toFixed(2)) : 0,
+      activeDays: dayKeys.size,
+      firstVisitAt: stamps.length ? new Date(Math.min(...stamps)).toISOString() : null,
+      lastVisitAt: stamps.length ? new Date(Math.max(...stamps)).toISOString() : null,
+      gpsShared: clients.filter((c) => c.gpsShared).length,
+      automated: clients.filter((c) => c.privacy.automated).length,
+      topCountries: topOf(countries),
+      topCities: topOf(cities),
+      topDevices: topOf(devices),
+      topBrowsers: topOf(browsers),
+      topSystems: topOf(systems),
+      topLanguages: topOf(langs),
+      topTimezones: topOf(timezones),
+      topReferrers: topOf(referrers),
+      visitsByHourUTC: topOf(hours, 24).sort((a, b) => a.value.localeCompare(b.value)),
+    },
+    clients,
+    visits: list,
+  };
+}
+
 async function recordHit(req, body) {
   const ip = clientIp(req);
   const visits = readVisits();
@@ -806,13 +1038,35 @@ app.post("/api/visit", async (req, res) => {
   const visit = sanitizeVisit(req.body, req, ip, geo);
   const visits = readVisits();
   visits.unshift(visit);
-  writeVisits(visits.slice(0, MAX_VISITS));
-  res.status(201).json({ ok: true, visit, total: Math.min(visits.length, MAX_VISITS) });
+  const saved = writeVisits(visits.slice(0, MAX_VISITS));
+  res.status(201).json({
+    ok: true,
+    visit,
+    total: Math.min(visits.length, MAX_VISITS),
+    summary: saved.summary,
+  });
 });
 
 app.get("/api/visits", (req, res) => {
-  const visits = readVisits();
-  res.json({ total: visits.length, file: "data/visits.json", visits });
+  const file = readVisitsFile();
+  res.json({
+    total: file.visits.length,
+    file: "data/visits.json",
+    generatedAt: file.generatedAt,
+    summary: file.summary,
+    clients: file.clients,
+    visits: file.visits,
+  });
+});
+
+// Synthèse seule : utile pour un tableau de bord sans transporter tout le journal.
+app.get("/api/visits/summary", (req, res) => {
+  const file = readVisitsFile();
+  res.json({
+    generatedAt: file.generatedAt,
+    summary: file.summary,
+    clients: file.clients,
+  });
 });
 
 app.delete("/api/visits", (req, res) => {

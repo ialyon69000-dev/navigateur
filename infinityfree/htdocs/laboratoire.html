@@ -45,6 +45,30 @@
 
     <p id="lab-empty" class="news-status" data-i18n="lab.empty" hidden>Пока ни одного визита.</p>
 
+    <h2 class="kicker" style="margin-top:1.6rem" data-i18n="lab.synthesis">Сводка по посетителям</h2>
+    <p class="meta" data-i18n="lab.synthesis-desc">Сводка рассчитывается из уже записанных данных браузера.</p>
+    <div id="summary-cards" class="summary-cards"></div>
+    <div id="summary-tops" class="summary-tops"></div>
+
+    <h2 class="kicker" style="margin-top:1.6rem" data-i18n="lab.clients">Клиенты</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="th.client">Клиент</th>
+            <th data-i18n="th.visits">Визиты</th>
+            <th data-i18n="th.status">Статус</th>
+            <th data-i18n="th.geo">Гео IP</th>
+            <th data-i18n="th.system">Система</th>
+            <th data-i18n="th.lang">Язык</th>
+            <th data-i18n="th.first-seen">Первый визит</th>
+            <th data-i18n="th.last-seen">Последний визит</th>
+          </tr>
+        </thead>
+        <tbody id="client-rows"></tbody>
+      </table>
+    </div>
+
     <div class="table-wrap">
       <table>
         <thead>

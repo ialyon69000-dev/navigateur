@@ -145,14 +145,18 @@ function readVisits() {
     if (!file_exists($VISITS_FILE)) return [];
     $raw = @file_get_contents($VISITS_FILE);
     $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
+    if (!is_array($data)) return [];
+    // Format actuel : { summary, clients, visits } ; format historique : tableau.
+    if (isset($data['visits']) && is_array($data['visits'])) return $data['visits'];
+    return $data;
 }
 
 function writeVisits($visits) {
     global $VISITS_FILE, $DATA_DIR;
     if (!is_dir($DATA_DIR)) @mkdir($DATA_DIR, 0775, true);
     $tmp = $VISITS_FILE . '.tmp.' . getmypid();
-    $json = json_encode($visits, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
+    $payload = buildVisitsFile(is_array($visits) ? $visits : []);
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
     // flock
     $fh = fopen($tmp, 'w');
     if ($fh) {
@@ -166,6 +170,7 @@ function writeVisits($visits) {
     } else {
         file_put_contents($VISITS_FILE, $json);
     }
+    return $payload;
 }
 
 function parseAcceptLanguage($header) {
@@ -332,4 +337,243 @@ function sanitizeVisit($body, $ip, $geo) {
         ],
         'consent' => ($client['consent'] ?? false) === true,
     ];
+}
+
+// ——— Synthèse des visiteurs ————————————————————————————————————————
+// Même logique que server.js : visits.json contient la liste brute plus une
+// fiche par client (empreinte recalculée) et un résumé global.
+
+function visitDeviceType($v) {
+    $ua = (string)($v['userAgent'] ?? '');
+    $hints = $v['clientHints'] ?? [];
+    $touch = (int)($v['maxTouchPoints'] ?? 0);
+    $isTablet = preg_match('/iPad|Tablet|PlayBook|Silk/i', $ua)
+        || (preg_match('/Android/i', $ua) && !preg_match('/Mobile/i', $ua))
+        || (($v['platform'] ?? null) === 'MacIntel' && $touch > 1);
+    if ($isTablet) return 'tablet';
+    if (($hints['mobile'] ?? null) === true || preg_match('/Mobi|iPhone|Android/i', $ua)) return 'mobile';
+    return 'desktop';
+}
+
+function visitBrowserName($v) {
+    $hints = $v['clientHints'] ?? [];
+    $brands = array_merge($hints['fullVersionList'] ?? [], $hints['brands'] ?? []);
+    foreach ($brands as $b) {
+        if (!preg_match('/Not.?A.?Brand/i', $b) && !preg_match('/Chromium/i', $b)) return clampStr($b, 60);
+    }
+    $ua = (string)($v['userAgent'] ?? '');
+    if (preg_match('#Edg/#', $ua)) return 'Edge';
+    if (preg_match('#OPR/|Opera#', $ua)) return 'Opera';
+    if (preg_match('#YaBrowser#', $ua)) return 'Yandex';
+    if (preg_match('#Firefox/#', $ua)) return 'Firefox';
+    if (preg_match('#Chrome/#', $ua)) return 'Chrome';
+    if (preg_match('#Safari/#', $ua)) return 'Safari';
+    return null;
+}
+
+function visitOsName($v) {
+    $hints = $v['clientHints'] ?? [];
+    if (!empty($hints['platform'])) {
+        return clampStr($hints['platform'] . (!empty($hints['platformVersion']) ? ' ' . $hints['platformVersion'] : ''), 60);
+    }
+    return clampStr($v['platform'] ?? platformFromUa($v['userAgent'] ?? ''), 60);
+}
+
+function visitClientKey($v) {
+    $s = $v['screen'] ?? [];
+    $gpu = $v['gpu'] ?? [];
+    $parts = implode('|', [
+        $v['ip'] ?? '',
+        visitOsName($v) ?? '',
+        visitBrowserName($v) ?? '',
+        visitDeviceType($v),
+        $s['width'] ?? '',
+        $s['height'] ?? '',
+        $s['colorDepth'] ?? '',
+        $v['timezone'] ?? '',
+        $v['language'] ?? '',
+        $v['hardwareConcurrency'] ?? '',
+        $v['deviceMemory'] ?? '',
+        $gpu['renderer'] ?? '',
+    ]);
+    return 'c_' . substr(hash('sha256', $parts), 0, 16);
+}
+
+function visitTopOf($counter, $limit = 5) {
+    $keys = array_keys($counter);
+    usort($keys, function ($a, $b) use ($counter) {
+        if ($counter[$b] !== $counter[$a]) return $counter[$b] - $counter[$a];
+        return strcmp((string)$a, (string)$b);
+    });
+    $out = [];
+    foreach (array_slice($keys, 0, $limit) as $k) {
+        $out[] = ['value' => (string)$k, 'count' => $counter[$k]];
+    }
+    return $out;
+}
+
+function visitBump(&$counter, $key) {
+    if ($key === null || $key === '') return;
+    $key = (string)$key;
+    $counter[$key] = ($counter[$key] ?? 0) + 1;
+}
+
+function summarizeVisitClient($visits) {
+    usort($visits, function ($a, $b) {
+        return strtotime($a['recordedAt'] ?? '') <=> strtotime($b['recordedAt'] ?? '');
+    });
+    $first = $visits[0];
+    $last = $visits[count($visits) - 1];
+    $geo = $last['geoIp'] ?? [];
+    $days = [];
+    $referrers = [];
+    $languages = [];
+    $gps = false;
+    foreach ($visits as $v) {
+        $d = substr((string)($v['recordedAt'] ?? ''), 0, 10);
+        if ($d) $days[$d] = true;
+        if (!empty($v['referrer'])) visitBump($referrers, $v['referrer']);
+        visitBump($languages, $v['language'] ?? null);
+        if (!empty($v['geolocation'])) $gps = true;
+    }
+    $span = strtotime($last['recordedAt'] ?? '') - strtotime($first['recordedAt'] ?? '');
+    $screen = $last['screen'] ?? [];
+    $theme = $last['theme'] ?? [];
+    $network = $last['network'] ?? [];
+    $ids = [];
+    foreach ($visits as $v) { if (!empty($v['id'])) $ids[] = $v['id']; }
+
+    return [
+        'clientId' => visitClientKey($last),
+        'visits' => count($visits),
+        'distinctDays' => count($days),
+        'firstSeen' => $first['recordedAt'] ?? null,
+        'lastSeen' => $last['recordedAt'] ?? null,
+        'returning' => count($visits) > 1,
+        'daysBetweenFirstAndLast' => round($span / 86400, 2),
+        'ip' => $last['ip'] ?? null,
+        'place' => [
+            'city' => $geo['city'] ?? null,
+            'region' => $geo['region'] ?? null,
+            'country' => $geo['country'] ?? null,
+            'countryCode' => $geo['countryCode'] ?? null,
+            'isp' => $geo['isp'] ?? null,
+        ],
+        'gpsShared' => $gps,
+        'device' => [
+            'type' => visitDeviceType($last),
+            'os' => visitOsName($last),
+            'browser' => visitBrowserName($last),
+            'screen' => (!empty($screen['width']) && !empty($screen['height'])) ? ($screen['width'] . '×' . $screen['height']) : null,
+            'gpu' => $last['gpu']['renderer'] ?? null,
+            'cores' => $last['hardwareConcurrency'] ?? null,
+            'memoryGB' => $last['deviceMemory'] ?? null,
+            'touch' => (int)($last['maxTouchPoints'] ?? 0) > 0,
+        ],
+        'preferences' => [
+            'language' => $last['language'] ?? null,
+            'languages' => $last['languages'] ?? [],
+            'timezone' => $last['timezone'] ?? null,
+            'colorScheme' => $theme['colorScheme'] ?? null,
+            'reducedMotion' => $theme['reducedMotion'] ?? null,
+            'keyboardLayout' => $last['keyboard']['layout'] ?? null,
+        ],
+        'network' => [
+            'effectiveType' => $network['effectiveType'] ?? null,
+            'downlink' => $network['downlink'] ?? null,
+            'rtt' => $network['rtt'] ?? null,
+            'saveData' => $network['saveData'] ?? null,
+        ],
+        'privacy' => [
+            'cookiesEnabled' => $last['cookiesEnabled'] ?? null,
+            'globalPrivacyControl' => $last['globalPrivacyControl'] ?? null,
+            'consent' => ($last['consent'] ?? false) === true,
+            'automated' => ($last['webdriver'] ?? false) === true,
+        ],
+        'referrers' => visitTopOf($referrers, 5),
+        'languagesSeen' => visitTopOf($languages, 5),
+        'visitIds' => array_slice($ids, -50),
+    ];
+}
+
+function buildVisitsFile($visits) {
+    $list = is_array($visits) ? array_values(array_filter($visits, 'is_array')) : [];
+    $groups = [];
+    foreach ($list as $v) {
+        $k = visitClientKey($v);
+        if (!isset($groups[$k])) $groups[$k] = [];
+        $groups[$k][] = $v;
+    }
+    $clients = array_map('summarizeVisitClient', array_values($groups));
+    usort($clients, function ($a, $b) {
+        return strtotime($b['lastSeen'] ?? '') <=> strtotime($a['lastSeen'] ?? '');
+    });
+
+    $countries = []; $cities = []; $devices = []; $browsers = []; $systems = [];
+    $langs = []; $timezones = []; $referrers = []; $hours = [];
+    $returning = 0; $gpsShared = 0; $automated = 0;
+    foreach ($clients as $c) {
+        visitBump($countries, $c['place']['country']);
+        visitBump($cities, trim(implode(', ', array_filter([$c['place']['city'], $c['place']['country']]))));
+        visitBump($devices, $c['device']['type']);
+        visitBump($browsers, $c['device']['browser']);
+        visitBump($systems, $c['device']['os']);
+        visitBump($langs, $c['preferences']['language']);
+        visitBump($timezones, $c['preferences']['timezone']);
+        foreach ($c['referrers'] as $r) {
+            $referrers[$r['value']] = ($referrers[$r['value']] ?? 0) + $r['count'];
+        }
+        if ($c['returning']) $returning++;
+        if ($c['gpsShared']) $gpsShared++;
+        if ($c['privacy']['automated']) $automated++;
+    }
+    $stamps = []; $days = [];
+    foreach ($list as $v) {
+        $t = strtotime($v['recordedAt'] ?? '');
+        if ($t) {
+            $stamps[] = $t;
+            visitBump($hours, gmdate('H', $t) . 'h');
+        }
+        $d = substr((string)($v['recordedAt'] ?? ''), 0, 10);
+        if ($d) $days[$d] = true;
+    }
+    $byHour = visitTopOf($hours, 24);
+    usort($byHour, function ($a, $b) { return strcmp($a['value'], $b['value']); });
+    $n = count($clients);
+
+    return [
+        'generatedAt' => gmdate('c'),
+        'summary' => [
+            'totalVisits' => count($list),
+            'uniqueClients' => $n,
+            'returningClients' => $returning,
+            'newClients' => $n - $returning,
+            'returningRate' => $n ? round($returning / $n, 3) : 0,
+            'visitsPerClient' => $n ? round(count($list) / $n, 2) : 0,
+            'activeDays' => count($days),
+            'firstVisitAt' => $stamps ? gmdate('c', min($stamps)) : null,
+            'lastVisitAt' => $stamps ? gmdate('c', max($stamps)) : null,
+            'gpsShared' => $gpsShared,
+            'automated' => $automated,
+            'topCountries' => visitTopOf($countries),
+            'topCities' => visitTopOf($cities),
+            'topDevices' => visitTopOf($devices),
+            'topBrowsers' => visitTopOf($browsers),
+            'topSystems' => visitTopOf($systems),
+            'topLanguages' => visitTopOf($langs),
+            'topTimezones' => visitTopOf($timezones),
+            'topReferrers' => visitTopOf($referrers),
+            'visitsByHourUTC' => $byHour,
+        ],
+        'clients' => $clients,
+        'visits' => $list,
+    ];
+}
+
+function readVisitsFile() {
+    global $VISITS_FILE;
+    if (!file_exists($VISITS_FILE)) return buildVisitsFile([]);
+    $data = json_decode(@file_get_contents($VISITS_FILE), true);
+    if (is_array($data) && isset($data['visits']) && is_array($data['visits'])) return $data;
+    return buildVisitsFile(is_array($data) ? $data : []);
 }
