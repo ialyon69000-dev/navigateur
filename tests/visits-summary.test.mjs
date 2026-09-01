@@ -1,6 +1,6 @@
 /**
- * visits.json ne contient plus seulement le journal brut : il porte aussi une
- * synthèse (summary) et une fiche par client, recalculées à chaque écriture à
+ * Deux fichiers : visits.json (journal brut intégral) et visits_summary.json
+ * (synthèse dérivée). La synthèse est recalculée à chaque écriture à
  * partir des seules données déjà envoyées par le navigateur.
  */
 import test, { after } from "node:test";
@@ -20,7 +20,11 @@ const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
 
 const visitsFile = () => path.join(dataDir, "visits.json");
-const readFile = () => JSON.parse(fs.readFileSync(visitsFile(), "utf8"));
+const summaryFile = () => path.join(dataDir, "visits_summary.json");
+const readJournal = () => JSON.parse(fs.readFileSync(visitsFile(), "utf8"));
+// `readFile()` renvoie la synthèse, augmentée du journal pour les assertions
+// historiques (les deux vivent désormais dans deux fichiers distincts).
+const readFile = () => ({ ...JSON.parse(fs.readFileSync(summaryFile(), "utf8")), visits: readJournal() });
 
 function clientBody(extra = {}) {
   return {
@@ -61,13 +65,20 @@ function replay(visit, minutesLater) {
   return copy;
 }
 
-test("visits.json porte une synthèse et une fiche par client", async () => {
+test("les deux fichiers sont séparés : journal brut et synthèse", async () => {
   const first = await record(clientBody());
   assert.equal(first.status, 201);
   assert.ok(first.json.summary, "la réponse renvoie la synthèse à jour");
 
   const file = readFile();
-  assert.deepEqual(Object.keys(file), ["generatedAt", "summary", "clients", "visits"]);
+  // visits.json : le journal seul ; visits_summary.json : la synthèse seule.
+  assert.ok(Array.isArray(readJournal()), "visits.json est un tableau de visites");
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(summaryFile(), "utf8"))), [
+    "generatedAt",
+    "source",
+    "summary",
+    "clients",
+  ]);
   assert.equal(file.summary.totalVisits, 1);
   assert.equal(file.summary.uniqueClients, 1);
   assert.equal(file.summary.returningClients, 0);

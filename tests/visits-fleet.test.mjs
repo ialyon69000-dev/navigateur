@@ -26,7 +26,13 @@ const base = `http://127.0.0.1:${server.address().port}`;
 after(() => server.close());
 
 const visitsFile = () => path.join(dataDir, "visits.json");
-const readFile = () => JSON.parse(fs.readFileSync(visitsFile(), "utf8"));
+const summaryFile = () => path.join(dataDir, "visits_summary.json");
+// la synthèse vit dans son propre fichier ; on y joint le journal pour les
+// assertions qui portent sur les deux
+const readFile = () => ({
+  ...JSON.parse(fs.readFileSync(summaryFile(), "utf8")),
+  visits: JSON.parse(fs.readFileSync(visitsFile(), "utf8")),
+});
 const reset = () => fs.writeFileSync(visitsFile(), "[]\n");
 
 // Terminaux rigoureusement identiques : même modèle, même écran, même GPU.

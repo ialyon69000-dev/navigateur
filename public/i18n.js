@@ -161,6 +161,14 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     },
     "lab.refresh": { ru: "Обновить", en: "Refresh" },
     "lab.download": { ru: "Скачать visits.json", en: "Download visits.json" },
+    "lab.download-summary": {
+      ru: "Скачать visits_summary.json",
+      en: "Download visits_summary.json",
+    },
+    "lab.files": {
+      ru: "Два файла: visits.json — полный журнал, visits_summary.json — сводка.",
+      en: "Two files: visits.json — the full journal, visits_summary.json — the synthesis.",
+    },
     "lab.clear": { ru: "Очистить журнал", en: "Clear the journal" },
     "lab.empty": { ru: "Пока ни одного визита.", en: "No visits recorded yet." },
     "lab.confirm-clear": {

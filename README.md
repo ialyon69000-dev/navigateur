@@ -51,16 +51,47 @@ L'utilisateur lit la langue qu'il a choisie (repli sur le russe si la version
 manque). Les brouillons (`active: false`) ne quittent jamais le serveur.
 Stockage : `data/messages.json` et `data/dispatches.json` (mêmes fichiers côté PHP).
 
-## Synthèse des visiteurs (`data/visits.json`)
+## Journal et synthèse : deux fichiers
 
-`visits.json` n'est plus un simple tableau : le fichier porte désormais la
-synthèse des clients qui consultent le site, recalculée à chaque écriture à
-partir des **seules** données déjà envoyées par le navigateur (aucune collecte
-supplémentaire, aucun cookie de suivi).
+| Fichier | Rôle | Forme |
+|---------|------|-------|
+| `data/visits.json` | **le journal brut, intégral** — une entrée par visite, rien d'agrégé, rien de dédupliqué (toutes les IP traversées sont conservées) | tableau |
+| `data/visits_summary.json` | **la synthèse** — dérivée du journal, une fiche par client + vue d'ensemble | objet |
+
+La synthèse est régénérée à chaque écriture du journal : les deux fichiers ne
+peuvent pas diverger. Si elle est absente ou ne correspond plus au journal
+(édition manuelle, restauration), elle est reconstruite à la lecture suivante.
+Elle ne recopie jamais les visites : elle référence sa source.
+
+Tout est calculé à partir des **seules** données déjà envoyées par le
+navigateur — aucune collecte supplémentaire.
+
+### `data/visits.json` — le journal
+
+```jsonc
+[
+  {
+    "id": "v_m0abc_1f2e3d",
+    "recordedAt": "2026-09-01T20:19:42.700Z",
+    "deviceId": "d_…", "deviceConfirmed": true,
+    "ip": "85.10.1.13",              // l'IP réelle de CETTE visite
+    "geoIp": { "city": "Moscow", "country": "Russia", "isp": "…" },
+    "language": "ru", "timezone": "Europe/Moscow",
+    "screen": { "width": 412, "height": 915, "…": "…" },
+    "userAgent": "…", "clientHints": { "…": "…" },
+    "gpu": {}, "network": {}, "theme": {}, "voices": {}, "storage": {},
+    "referrer": "https://ya.ru/", "consent": true
+  }
+  // … une entrée par visite, jusqu'à MAX_VISITS (800)
+]
+```
+
+### `data/visits_summary.json` — la synthèse
 
 ```jsonc
 {
   "generatedAt": "2026-09-01T20:19:42.700Z",
+  "source": "data/visits.json",
   "summary": {                 // vue d'ensemble
     "totalVisits": 42, "uniqueClients": 17,
     "returningClients": 6, "newClients": 11,
@@ -96,8 +127,7 @@ supplémentaire, aucun cookie de suivi).
       "gpsShared": false,
       "visitIds": ["v_…"]
     }
-  ],
-  "visits": [ /* le journal brut, inchangé */ ]
+  ]
 }
 ```
 
@@ -137,13 +167,17 @@ Pour une distinction certaine sans cookie, il faut un identifiant explicite
 (paramètre d'URL par terminal, compte connecté, en-tête applicatif) — aucune
 donnée passive du navigateur ne peut y suppléer.
 
-Compatibilité : un ancien `visits.json` (tableau brut) est toujours lu, et la
-synthèse est reconstruite à la première écriture.
+Compatibilité : un ancien `visits.json` — tableau brut, ou version fusionnée
+`{ summary, clients, visits }` — est toujours lu ; le journal reprend sa forme
+de tableau et la synthèse repart dans son fichier dès l'écriture suivante,
+sans perte de visites.
 
 | Route | Effet |
 |-------|-------|
 | `GET /api/visits` | journal + `summary` + `clients` |
 | `GET /api/visits/summary` (PHP : `api/visits.php?summary=1`) | synthèse seule, sans le journal |
+| `GET /api/visits.json` | télécharge **le journal brut** |
+| `GET /api/visits_summary.json` (PHP : `api/visits_summary.php`) | télécharge **la synthèse** |
 | `POST /api/visit` | enregistre la visite et renvoie la `summary` à jour |
 | `DELETE /api/visits` | vide le journal et remet la synthèse à zéro |
 
@@ -158,7 +192,7 @@ référents) et un tableau des clients.
 - APIs : `/api/me`, `/api/news`, `/api/visit`, `/api/visits`, `/api/health`,
   `/api/messages`, `/api/dispatches` (lecture + écriture admin)
 - Authentification : `/api/auth/login|register|me|logout`, tableau de bord `/dashboard.html`
-- Stockage `data/` (visits.json, users.json, sessions.json, dispatches.json, messages.json, news_cache.json)
+- Stockage `data/` (visits.json, visits_summary.json, users.json, sessions.json, dispatches.json, messages.json, news_cache.json)
 - `render.yaml` prêt pour Render.com
 
 **Lancer :**

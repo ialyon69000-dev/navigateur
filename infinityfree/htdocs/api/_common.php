@@ -1,6 +1,8 @@
 <?php
 $DATA_DIR = __DIR__ . '/../data';
 $VISITS_FILE = $DATA_DIR . '/visits.json';
+// La synthèse a son propre fichier : visits.json reste le journal brut.
+$VISITS_SUMMARY_FILE = $DATA_DIR . '/visits_summary.json';
 $NEWS_CACHE_FILE = $DATA_DIR . '/news_cache.json';
 $MAX_VISITS = 800;
 $NEWS_TTL_MS = 5 * 60 * 1000;
@@ -139,6 +141,7 @@ function jsonResponse($data, $code = 200) {
     exit;
 }
 
+// visits.json : le journal brut, un tableau de visites, rien d'autre.
 function readVisits() {
     global $VISITS_FILE, $DATA_DIR;
     if (!is_dir($DATA_DIR)) @mkdir($DATA_DIR, 0775, true);
@@ -146,18 +149,14 @@ function readVisits() {
     $raw = @file_get_contents($VISITS_FILE);
     $data = json_decode($raw, true);
     if (!is_array($data)) return [];
-    // Format actuel : { summary, clients, visits } ; format historique : tableau.
+    // Tolère la version précédente, où la synthèse était logée dans le journal.
     if (isset($data['visits']) && is_array($data['visits'])) return $data['visits'];
     return $data;
 }
 
-function writeVisits($visits) {
-    global $VISITS_FILE, $DATA_DIR;
-    if (!is_dir($DATA_DIR)) @mkdir($DATA_DIR, 0775, true);
-    $tmp = $VISITS_FILE . '.tmp.' . getmypid();
-    $payload = buildVisitsFile(is_array($visits) ? $visits : []);
+function writeJsonAtomic($file, $payload) {
+    $tmp = $file . '.tmp.' . getmypid();
     $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
-    // flock
     $fh = fopen($tmp, 'w');
     if ($fh) {
         if (flock($fh, LOCK_EX)) {
@@ -166,11 +165,21 @@ function writeVisits($visits) {
             flock($fh, LOCK_UN);
         }
         fclose($fh);
-        @rename($tmp, $VISITS_FILE);
+        @rename($tmp, $file);
     } else {
-        file_put_contents($VISITS_FILE, $json);
+        file_put_contents($file, $json);
     }
-    return $payload;
+}
+
+// Écrit le journal PUIS régénère la synthèse : les deux fichiers ne divergent pas.
+function writeVisits($visits) {
+    global $VISITS_FILE, $VISITS_SUMMARY_FILE, $DATA_DIR;
+    if (!is_dir($DATA_DIR)) @mkdir($DATA_DIR, 0775, true);
+    $list = is_array($visits) ? array_values($visits) : [];
+    writeJsonAtomic($VISITS_FILE, $list);
+    $summary = buildSummaryFile($list);
+    writeJsonAtomic($VISITS_SUMMARY_FILE, $summary);
+    return $summary;
 }
 
 function parseAcceptLanguage($header) {
@@ -547,7 +556,7 @@ function summarizeVisitClient($visits, $confirmed = null) {
     ];
 }
 
-function buildVisitsFile($visits) {
+function buildSummaryFile($visits) {
     $list = is_array($visits) ? array_values(array_filter($visits, 'is_array')) : [];
     // Un cookie ne compte que si le navigateur l'a représenté au moins une fois.
     $confirmed = [];
@@ -605,6 +614,7 @@ function buildVisitsFile($visits) {
 
     return [
         'generatedAt' => gmdate('c'),
+        'source' => 'data/visits.json',
         'summary' => [
             'totalVisits' => count($list),
             'uniqueClients' => $n,
@@ -631,14 +641,21 @@ function buildVisitsFile($visits) {
             'visitsByHourUTC' => $byHour,
         ],
         'clients' => $clients,
-        'visits' => $list,
     ];
 }
 
-function readVisitsFile() {
-    global $VISITS_FILE;
-    if (!file_exists($VISITS_FILE)) return buildVisitsFile([]);
-    $data = json_decode(@file_get_contents($VISITS_FILE), true);
-    if (is_array($data) && isset($data['visits']) && is_array($data['visits'])) return $data;
-    return buildVisitsFile(is_array($data) ? $data : []);
+// Relit la synthèse ; la recalcule si elle manque ou ne correspond plus au journal.
+function readSummaryFile() {
+    global $VISITS_SUMMARY_FILE;
+    $visits = readVisits();
+    if (file_exists($VISITS_SUMMARY_FILE)) {
+        $cached = json_decode(@file_get_contents($VISITS_SUMMARY_FILE), true);
+        if (is_array($cached) && isset($cached['summary']['totalVisits'])
+            && $cached['summary']['totalVisits'] === count($visits)) {
+            return $cached;
+        }
+    }
+    $rebuilt = buildSummaryFile($visits);
+    @writeJsonAtomic($VISITS_SUMMARY_FILE, $rebuilt);
+    return $rebuilt;
 }

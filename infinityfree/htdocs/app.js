@@ -938,6 +938,9 @@
     $("btn-download")?.addEventListener("click", () => {
       window.location.href = "/api/visits.json";
     });
+    $("btn-download-summary")?.addEventListener("click", () => {
+      window.location.href = "/api/visits_summary.php";
+    });
     $("btn-clear")?.addEventListener("click", async () => {
       if (!confirm(T("lab.confirm-clear"))) return;
       await fetch("/api/visits", { method: "DELETE" });

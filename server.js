@@ -16,6 +16,9 @@ const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(__dirname, "data");
 const VISITS_FILE = path.join(DATA_DIR, "visits.json");
+// La synthèse vit dans son propre fichier : visits.json reste le journal brut,
+// intégral et append-only, que rien ne vient encombrer.
+const VISITS_SUMMARY_FILE = path.join(DATA_DIR, "visits_summary.json");
 const NEWS_CACHE_FILE = path.join(DATA_DIR, "news_cache.json");
 
 const FEEDS = [
@@ -235,16 +238,23 @@ const lastVisitByIp = new Map();
 function ensureDataFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(VISITS_FILE)) fs.writeFileSync(VISITS_FILE, "[]\n", "utf8");
+  if (!fs.existsSync(VISITS_SUMMARY_FILE)) {
+    fs.writeFileSync(
+      VISITS_SUMMARY_FILE,
+      JSON.stringify(buildSummaryFile([]), null, 2) + "\n",
+      "utf8"
+    );
+  }
 }
 
+// visits.json : le journal brut, un tableau de visites, rien d'autre.
 function readVisits() {
   ensureDataFile();
   try {
     const raw = fs.readFileSync(VISITS_FILE, "utf8");
     const data = JSON.parse(raw);
-    // Format historique : un simple tableau de visites.
     if (Array.isArray(data)) return data;
-    // Format actuel : { summary, clients, visits }.
+    // Tolère la version précédente, où la synthèse était logée dans le journal.
     if (data && Array.isArray(data.visits)) return data.visits;
     return [];
   } catch {
@@ -252,26 +262,44 @@ function readVisits() {
   }
 }
 
+function writeJsonAtomic(file, payload) {
+  const tmp = file + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, file);
+}
+
+// Écrit le journal PUIS régénère la synthèse : les deux fichiers ne peuvent pas
+// diverger, la synthèse étant toujours dérivée du journal qu'on vient d'écrire.
 function writeVisits(visits) {
   ensureDataFile();
   const list = Array.isArray(visits) ? visits : [];
-  const payload = buildVisitsFile(list);
-  const tmp = VISITS_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2) + "\n", "utf8");
-  fs.renameSync(tmp, VISITS_FILE);
-  return payload;
+  writeJsonAtomic(VISITS_FILE, list);
+  const summary = buildSummaryFile(list);
+  writeJsonAtomic(VISITS_SUMMARY_FILE, summary);
+  return summary;
 }
 
-function readVisitsFile() {
+// Relit la synthèse sur disque ; la recalcule si le fichier manque ou date d'un
+// journal plus récent (édition manuelle, restauration, montée de version).
+function readSummaryFile() {
   ensureDataFile();
+  const visits = readVisits();
   try {
-    const raw = fs.readFileSync(VISITS_FILE, "utf8");
-    const data = JSON.parse(raw);
-    if (data && !Array.isArray(data) && Array.isArray(data.visits)) return data;
-    return buildVisitsFile(Array.isArray(data) ? data : []);
+    const raw = fs.readFileSync(VISITS_SUMMARY_FILE, "utf8");
+    const cached = JSON.parse(raw);
+    if (cached && cached.summary && cached.summary.totalVisits === visits.length) {
+      return cached;
+    }
   } catch {
-    return buildVisitsFile([]);
+    /* pas de synthèse exploitable : on la reconstruit */
   }
+  const rebuilt = buildSummaryFile(visits);
+  try {
+    writeJsonAtomic(VISITS_SUMMARY_FILE, rebuilt);
+  } catch {
+    /* disque en lecture seule : la synthèse reste servie en mémoire */
+  }
+  return rebuilt;
 }
 
 function clientIp(req) {
@@ -975,7 +1003,7 @@ function summarizeClient(visits, confirmed) {
   };
 }
 
-function buildVisitsFile(visits) {
+function buildSummaryFile(visits) {
   const list = Array.isArray(visits) ? visits : [];
   // Un cookie ne compte que si le navigateur l'a représenté au moins une fois.
   const confirmed = new Set();
@@ -1022,6 +1050,7 @@ function buildVisitsFile(visits) {
 
   return {
     generatedAt: new Date().toISOString(),
+    source: "data/visits.json",
     summary: {
       totalVisits: list.length,
       uniqueClients: clients.length,
@@ -1048,7 +1077,6 @@ function buildVisitsFile(visits) {
       visitsByHourUTC: topOf(hours, 24).sort((a, b) => a.value.localeCompare(b.value)),
     },
     clients,
-    visits: list,
   };
 }
 
@@ -1131,21 +1159,25 @@ app.post("/api/visit", async (req, res) => {
 });
 
 app.get("/api/visits", (req, res) => {
-  const file = readVisitsFile();
+  const visits = readVisits();
+  const file = readSummaryFile();
   res.json({
-    total: file.visits.length,
+    total: visits.length,
     file: "data/visits.json",
+    summaryFile: "data/visits_summary.json",
     generatedAt: file.generatedAt,
     summary: file.summary,
     clients: file.clients,
-    visits: file.visits,
+    visits,
   });
 });
 
 // Synthèse seule : utile pour un tableau de bord sans transporter tout le journal.
 app.get("/api/visits/summary", (req, res) => {
-  const file = readVisitsFile();
+  const file = readSummaryFile();
   res.json({
+    file: "data/visits_summary.json",
+    source: "data/visits.json",
     generatedAt: file.generatedAt,
     summary: file.summary,
     clients: file.clients,
@@ -1157,10 +1189,18 @@ app.delete("/api/visits", (req, res) => {
   res.json({ ok: true, total: 0 });
 });
 
+// Téléchargement du journal brut, tel qu'il est sur le disque.
 app.get("/api/visits.json", (req, res) => {
   ensureDataFile();
   res.setHeader("Content-Disposition", "attachment; filename=visits.json");
   res.type("application/json").send(fs.readFileSync(VISITS_FILE, "utf8"));
+});
+
+// Téléchargement de la synthèse (fichier séparé).
+app.get("/api/visits_summary.json", (req, res) => {
+  const file = readSummaryFile();
+  res.setHeader("Content-Disposition", "attachment; filename=visits_summary.json");
+  res.type("application/json").send(JSON.stringify(file, null, 2) + "\n");
 });
 
 app.get("/api/auth/me", (req, res) => {
