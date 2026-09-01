@@ -74,7 +74,9 @@ test("visits.json porte une synthèse et une fiche par client", async () => {
   assert.equal(file.visits.length, 1);
 
   const c = file.clients[0];
-  assert.match(c.clientId, /^c_[0-9a-f]{16}$/);
+  // sans cookie représenté, l'identité repose sur l'empreinte : préfixe fp_
+  assert.match(c.clientId, /^fp_[0-9a-f]{16}$/);
+  assert.equal(c.identity, "fingerprint");
   assert.equal(c.visits, 1);
   assert.equal(c.returning, false);
   assert.equal(c.device.type, "desktop");

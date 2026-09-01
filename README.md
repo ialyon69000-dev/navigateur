@@ -67,6 +67,9 @@ supplémentaire, aucun cookie de suivi).
     "returningRate": 0.353, "visitsPerClient": 2.47, "activeDays": 5,
     "firstVisitAt": "…", "lastVisitAt": "…",
     "gpsShared": 1, "automated": 0,
+    "identifiedByCookie": 14,        // comptage exact
+    "identifiedByFingerprint": 3,    // comptage approximatif
+    "clientsWithRotatingIp": 5,      // appareils vus depuis plusieurs IP
     "topCountries": [{ "value": "Russia", "count": 9 }],
     "topCities": [], "topDevices": [], "topBrowsers": [], "topSystems": [],
     "topLanguages": [], "topTimezones": [], "topReferrers": [],
@@ -75,7 +78,10 @@ supplémentaire, aucun cookie de suivi).
   "clients": [                 // une fiche par visiteur
     {
       "clientId": "c_33baca6a20fcf988",
+      "identity": "device",          // "device" (exact) | "fingerprint" (approx.)
+      "identityNote": "cookie propriétaire : un appareil distinct, même si son IP change",
       "visits": 3, "distinctDays": 2, "returning": true,
+      "distinctIps": 7, "rotatingIp": true,
       "firstSeen": "…", "lastSeen": "…", "daysBetweenFirstAndLast": 1.2,
       "ip": "203.0.113.4",
       "place": { "city": "Moscow", "region": "…", "country": "Russia", "isp": "…" },
@@ -95,10 +101,41 @@ supplémentaire, aucun cookie de suivi).
 }
 ```
 
-Le regroupement s'appuie sur une **empreinte stable recalculée** (IP, système,
-navigateur, type d'appareil, écran, langue, fuseau, GPU, cœurs, mémoire) hachée
-en `c_…` : deux passages du même poste comptent pour un seul client, sans
-identifiant persistant déposé chez l'internaute.
+### Comment un « client » est identifié
+
+Deux régimes, et le fichier dit toujours lequel s'applique (`identity`) :
+
+| `identity` | `clientId` | Base | Fiabilité |
+|-----------|-----------|------|-----------|
+| `device` | `c_…` | cookie propriétaire `okno-device` (httpOnly, ~13 mois) | **exacte** — un appareil distinct, même si son IP change |
+| `fingerprint` | `fp_…` | empreinte **sans IP** (système, navigateur, écran, GPU, langue, fuseau, cœurs, mémoire) | **approximative** — des appareils identiques peuvent être confondus |
+
+**L'IP n'entre jamais dans l'identité.** Elle change trop vite (mobile, VPN,
+CGNAT, proxys tournants) et fragmentait le comptage : un même téléphone
+apparaissait autant de fois qu'il changeait d'adresse. Elle reste consultable
+via `distinctIps` / `rotatingIp`, qui mesurent justement cette rotation.
+
+Un cookie n'est pris en compte qu'une fois **représenté** par le navigateur
+(`deviceConfirmed`). Un terminal qui refuse les cookies ne crée donc pas un
+client fantôme à chaque visite : il bascule en `fingerprint`.
+
+#### Cas d'une flotte de terminaux identiques à IP tournantes
+
+C'est le scénario qui met en défaut toute empreinte passive : le matériel étant
+identique, l'empreinte ne distingue pas les postes ; l'IP changeant sans cesse,
+elle ne les suit pas.
+
+- **Avec cookies** (cas normal) : comptage **exact**, chaque terminal est un
+  client, quel que soit le nombre d'IP traversées. Couvert par
+  `tests/visits-fleet.test.mjs`.
+- **Sans cookies** : les terminaux identiques **fusionnent** en un seul client.
+  C'est une limite intrinsèque, pas un réglage. Le fichier ne le masque pas :
+  ces clients sont marqués `fingerprint` et comptés dans
+  `identifiedByFingerprint`.
+
+Pour une distinction certaine sans cookie, il faut un identifiant explicite
+(paramètre d'URL par terminal, compte connecté, en-tête applicatif) — aucune
+donnée passive du navigateur ne peut y suppléer.
 
 Compatibilité : un ancien `visits.json` (tableau brut) est toujours lu, et la
 synthèse est reconstruite à la première écriture.

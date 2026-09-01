@@ -229,7 +229,7 @@ function sanitizeHints($raw) {
     ];
 }
 
-function sanitizeVisit($body, $ip, $geo) {
+function sanitizeVisit($body, $ip, $geo, $deviceId = null, $deviceConfirmed = false) {
     $client = is_array($body) ? $body : [];
     $languages = [];
     if (!empty($client['languages']) && is_array($client['languages'])) {
@@ -266,6 +266,8 @@ function sanitizeVisit($body, $ip, $geo) {
     return [
         'id' => 'v_' . base_convert((string)time(), 10, 36) . '_' . substr(bin2hex(random_bytes(4)), 0, 6),
         'recordedAt' => gmdate('c'),
+        'deviceId' => isValidDeviceId($deviceId) ? $deviceId : null,
+        'deviceConfirmed' => isValidDeviceId($deviceId) ? ($deviceConfirmed === true) : false,
         'ip' => $ip,
         'geoIp' => $geo,
         'geolocation' => $geolocation,
@@ -379,24 +381,64 @@ function visitOsName($v) {
     return clampStr($v['platform'] ?? platformFromUa($v['userAgent'] ?? ''), 60);
 }
 
-function visitClientKey($v) {
+// Identité d'appareil : cookie propriétaire (fiable même si l'IP tourne), à
+// défaut empreinte SANS IP (approximative : des terminaux identiques se
+// confondent). Voir server.js — même logique, mêmes clés.
+define('DEVICE_COOKIE', 'okno-device');
+define('DEVICE_TTL', 400 * 24 * 60 * 60);
+
+function isValidDeviceId($id) {
+    return is_string($id) && preg_match('/^d_[0-9a-f]{32}$/', $id) === 1;
+}
+
+function ensureDeviceId() {
+    $existing = $_COOKIE[DEVICE_COOKIE] ?? null;
+    if (isValidDeviceId($existing)) return [$existing, false];
+    $deviceId = 'd_' . bin2hex(random_bytes(16));
+    if (!headers_sent()) {
+        setcookie(DEVICE_COOKIE, $deviceId, [
+            'expires' => time() + DEVICE_TTL,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure' => !empty($_SERVER['HTTPS']),
+        ]);
+    }
+    return [$deviceId, true];
+}
+
+function visitFingerprintKey($v) {
     $s = $v['screen'] ?? [];
     $gpu = $v['gpu'] ?? [];
     $parts = implode('|', [
-        $v['ip'] ?? '',
         visitOsName($v) ?? '',
         visitBrowserName($v) ?? '',
         visitDeviceType($v),
         $s['width'] ?? '',
         $s['height'] ?? '',
         $s['colorDepth'] ?? '',
+        $s['pixelRatio'] ?? '',
         $v['timezone'] ?? '',
         $v['language'] ?? '',
         $v['hardwareConcurrency'] ?? '',
         $v['deviceMemory'] ?? '',
         $gpu['renderer'] ?? '',
     ]);
-    return 'c_' . substr(hash('sha256', $parts), 0, 16);
+    return substr(hash('sha256', $parts), 0, 16);
+}
+
+function visitIdentityMode($v, $confirmed = null) {
+    $id = $v['deviceId'] ?? null;
+    $ok = isValidDeviceId($id) && ($confirmed === null || isset($confirmed[$id]));
+    return $ok ? 'device' : 'fingerprint';
+}
+
+function visitClientKey($v, $confirmed = null) {
+    $id = $v['deviceId'] ?? null;
+    if (isValidDeviceId($id) && ($confirmed === null || isset($confirmed[$id]))) {
+        return 'c_' . substr($id, 2);
+    }
+    return 'fp_' . visitFingerprintKey($v);
 }
 
 function visitTopOf($counter, $limit = 5) {
@@ -418,7 +460,7 @@ function visitBump(&$counter, $key) {
     $counter[$key] = ($counter[$key] ?? 0) + 1;
 }
 
-function summarizeVisitClient($visits) {
+function summarizeVisitClient($visits, $confirmed = null) {
     usort($visits, function ($a, $b) {
         return strtotime($a['recordedAt'] ?? '') <=> strtotime($b['recordedAt'] ?? '');
     });
@@ -443,8 +485,15 @@ function summarizeVisitClient($visits) {
     $ids = [];
     foreach ($visits as $v) { if (!empty($v['id'])) $ids[] = $v['id']; }
 
+    $ips = [];
+    foreach ($visits as $v) { if (!empty($v['ip'])) $ips[$v['ip']] = true; }
+    $mode = visitIdentityMode($last, $confirmed);
     return [
-        'clientId' => visitClientKey($last),
+        'clientId' => visitClientKey($last, $confirmed),
+        'identity' => $mode,
+        'identityNote' => $mode === 'device'
+            ? 'cookie propriétaire : un appareil distinct, même si son IP change'
+            : 'empreinte sans IP : des appareils identiques peuvent être confondus',
         'visits' => count($visits),
         'distinctDays' => count($days),
         'firstSeen' => $first['recordedAt'] ?? null,
@@ -452,6 +501,8 @@ function summarizeVisitClient($visits) {
         'returning' => count($visits) > 1,
         'daysBetweenFirstAndLast' => round($span / 86400, 2),
         'ip' => $last['ip'] ?? null,
+        'distinctIps' => count($ips),
+        'rotatingIp' => count($ips) > 1,
         'place' => [
             'city' => $geo['city'] ?? null,
             'region' => $geo['region'] ?? null,
@@ -498,13 +549,21 @@ function summarizeVisitClient($visits) {
 
 function buildVisitsFile($visits) {
     $list = is_array($visits) ? array_values(array_filter($visits, 'is_array')) : [];
+    // Un cookie ne compte que si le navigateur l'a représenté au moins une fois.
+    $confirmed = [];
+    foreach ($list as $v) {
+        if (($v['deviceConfirmed'] ?? false) === true && isValidDeviceId($v['deviceId'] ?? null)) {
+            $confirmed[$v['deviceId']] = true;
+        }
+    }
     $groups = [];
     foreach ($list as $v) {
-        $k = visitClientKey($v);
+        $k = visitClientKey($v, $confirmed);
         if (!isset($groups[$k])) $groups[$k] = [];
         $groups[$k][] = $v;
     }
-    $clients = array_map('summarizeVisitClient', array_values($groups));
+    $clients = [];
+    foreach (array_values($groups) as $g) { $clients[] = summarizeVisitClient($g, $confirmed); }
     usort($clients, function ($a, $b) {
         return strtotime($b['lastSeen'] ?? '') <=> strtotime($a['lastSeen'] ?? '');
     });
@@ -512,6 +571,7 @@ function buildVisitsFile($visits) {
     $countries = []; $cities = []; $devices = []; $browsers = []; $systems = [];
     $langs = []; $timezones = []; $referrers = []; $hours = [];
     $returning = 0; $gpsShared = 0; $automated = 0;
+    $byCookie = 0; $byFingerprint = 0; $rotating = 0;
     foreach ($clients as $c) {
         visitBump($countries, $c['place']['country']);
         visitBump($cities, trim(implode(', ', array_filter([$c['place']['city'], $c['place']['country']]))));
@@ -526,6 +586,8 @@ function buildVisitsFile($visits) {
         if ($c['returning']) $returning++;
         if ($c['gpsShared']) $gpsShared++;
         if ($c['privacy']['automated']) $automated++;
+        if ($c['identity'] === 'device') $byCookie++; else $byFingerprint++;
+        if ($c['rotatingIp']) $rotating++;
     }
     $stamps = []; $days = [];
     foreach ($list as $v) {
@@ -555,6 +617,9 @@ function buildVisitsFile($visits) {
             'lastVisitAt' => $stamps ? gmdate('c', max($stamps)) : null,
             'gpsShared' => $gpsShared,
             'automated' => $automated,
+            'identifiedByCookie' => $byCookie,
+            'identifiedByFingerprint' => $byFingerprint,
+            'clientsWithRotatingIp' => $rotating,
             'topCountries' => visitTopOf($countries),
             'topCities' => visitTopOf($cities),
             'topDevices' => visitTopOf($devices),

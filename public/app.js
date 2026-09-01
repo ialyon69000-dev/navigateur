@@ -852,6 +852,9 @@
           [T("sum.returning"), `${s.returningClients} (${Math.round((s.returningRate || 0) * 100)}%)`],
           [T("sum.per-client"), s.visitsPerClient],
           [T("sum.days"), s.activeDays],
+          [T("sum.identified"), s.identifiedByCookie ?? 0],
+          [T("sum.approx"), s.identifiedByFingerprint ?? 0],
+          [T("sum.rotating"), s.clientsWithRotatingIp ?? 0],
         ];
         for (const [label, value] of items) {
           const div = document.createElement("div");
@@ -904,6 +907,8 @@
         const cells = [
           c.clientId,
           String(c.visits),
+          c.identity === "device" ? T("identity.device") : T("identity.fingerprint"),
+          c.rotatingIp ? `${c.distinctIps} ⟳` : String(c.distinctIps ?? 1),
           c.returning ? T("client.returning") : T("client.new"),
           [c.place?.city, c.place?.country].filter(Boolean).join(", ") || dash,
           [c.device?.type, c.device?.os, c.device?.browser].filter(Boolean).join(" · ") || dash,
@@ -911,11 +916,15 @@
           fmtDate(c.firstSeen),
           fmtDate(c.lastSeen),
         ];
-        for (const value of cells) {
+        cells.forEach((value, i) => {
           const td = document.createElement("td");
           td.textContent = value;
+          if (i === 2) {
+            td.title =
+              c.identity === "device" ? T("identity.device-hint") : T("identity.fingerprint-hint");
+          }
           tr.appendChild(td);
-        }
+        });
         rows.appendChild(tr);
       }
     }

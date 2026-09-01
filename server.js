@@ -64,9 +64,36 @@ app.use((req, res, next) => {
   next();
 });
 
+// ——— Identité d'appareil (cookie propriétaire) ————————————————————
+// Indispensable pour distinguer une flotte de terminaux identiques derrière des
+// IP tournantes : l'empreinte passive est alors la même pour tous les appareils
+// (même modèle, même écran, même GPU) tandis que l'IP change à chaque requête.
+// Seul un identifiant déposé par nous-mêmes reste stable dans ce cas.
+const DEVICE_COOKIE = "okno-device";
+const DEVICE_TTL_MS = 400 * 24 * 60 * 60 * 1000; // ~13 mois
+
+function isValidDeviceId(id) {
+  return typeof id === "string" && /^d_[0-9a-f]{32}$/.test(id);
+}
+
+function ensureDeviceId(req, res) {
+  const existing = cookieValue(req, DEVICE_COOKIE);
+  if (isValidDeviceId(existing)) return { deviceId: existing, isNew: false };
+  const deviceId = "d_" + crypto.randomBytes(16).toString("hex");
+  res.cookie(DEVICE_COOKIE, deviceId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: DEVICE_TTL_MS,
+    path: "/",
+  });
+  return { deviceId, isNew: true };
+}
+
 app.use((req, res, next) => {
   if (req.method === "GET" && (req.path === "/" || req.path === "/index.html")) {
-    recordHit(req, null).catch((err) => console.error("recordHit", err.message || err));
+    const { deviceId, isNew } = ensureDeviceId(req, res);
+    recordHit(req, null, deviceId, !isNew).catch((err) => console.error("recordHit", err.message || err));
   }
   next();
 });
@@ -618,7 +645,7 @@ function sanitizeHints(raw) {
   };
 }
 
-function sanitizeVisit(body, req, ip, geo) {
+function sanitizeVisit(body, req, ip, geo, deviceId, deviceConfirmed) {
   const client = body && typeof body === "object" ? body : {};
   const languages = Array.isArray(client.languages)
     ? client.languages.map((x) => clampStr(x, 20)).filter(Boolean).slice(0, 8)
@@ -637,6 +664,10 @@ function sanitizeVisit(body, req, ip, geo) {
   return {
     id: `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     recordedAt: new Date().toISOString(),
+    deviceId: isValidDeviceId(deviceId) ? deviceId : null,
+    // true : le navigateur nous a REPRÉSENTÉ le cookie, il le conserve donc.
+    // false : cookie tout juste émis, sa persistance n'est pas encore prouvée.
+    deviceConfirmed: isValidDeviceId(deviceId) ? deviceConfirmed === true : false,
     ip,
     geoIp: geo,
     geolocation:
@@ -805,26 +836,54 @@ function osName(v) {
   return clampStr(v.platform || platformFromUa(v.userAgent), 60);
 }
 
-// Empreinte stable : ce qui ne change pas d'une visite à l'autre pour un même
-// poste (IP, écran, matériel, langue, fuseau, GPU). Ni cookie ni identifiant
-// persistant côté navigateur : la clé est recalculée, jamais stockée en clair.
-function clientKey(v) {
+// Identité d'un client, par ordre de fiabilité décroissante.
+//
+// 1. deviceId — cookie propriétaire déposé par nous. Seul identifiant fiable
+//    quand plusieurs terminaux identiques se présentent derrière des IP
+//    tournantes : l'empreinte passive ne les distingue pas, l'IP ne les suit
+//    pas. C'est le cas d'une flotte de téléphones du même modèle.
+// 2. Empreinte SANS l'IP — pour les visiteurs qui refusent les cookies. Une IP
+//    qui tourne ne fragmente alors plus le comptage, mais deux appareils
+//    identiques restent confondus : le regroupement est marqué « approximatif ».
+//
+// L'IP n'entre jamais dans la clé : elle change trop vite (mobile, VPN, CGNAT)
+// et gonflait artificiellement le nombre de clients.
+function fingerprintKey(v) {
   const s = v.screen || {};
   const parts = [
-    v.ip || "",
     osName(v) || "",
     browserName(v) || "",
     deviceType(v),
     s.width || "",
     s.height || "",
     s.colorDepth || "",
+    s.pixelRatio || "",
     v.timezone || "",
     v.language || "",
     v.hardwareConcurrency || "",
     v.deviceMemory || "",
     (v.gpu && v.gpu.renderer) || "",
   ].join("|");
-  return "c_" + crypto.createHash("sha256").update(parts).digest("hex").slice(0, 16);
+  return crypto.createHash("sha256").update(parts).digest("hex").slice(0, 16);
+}
+
+// `confirmed` : ensemble des deviceId que le navigateur nous a rendus au moins
+// une fois. Un cookie jamais représenté (terminal qui les refuse) est ignoré :
+// sinon chaque visite créerait un client fantôme.
+function clientKey(v, confirmed) {
+  if (isValidDeviceId(v.deviceId) && (!confirmed || confirmed.has(v.deviceId))) {
+    return "c_" + v.deviceId.slice(2);
+  }
+  return "fp_" + fingerprintKey(v);
+}
+
+// « device » : identité certaine (un cookie = un appareil).
+// « fingerprint » : regroupement approximatif, des appareils identiques peuvent
+// être confondus et un même appareil peut se dédoubler s'il efface ses cookies.
+function identityMode(v, confirmed) {
+  return isValidDeviceId(v.deviceId) && (!confirmed || confirmed.has(v.deviceId))
+    ? "device"
+    : "fingerprint";
 }
 
 function topOf(counter, limit = 5) {
@@ -839,7 +898,7 @@ function bump(counter, key) {
   counter[key] = (counter[key] || 0) + 1;
 }
 
-function summarizeClient(visits) {
+function summarizeClient(visits, confirmed) {
   const sorted = visits.slice().sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt));
   const last = sorted[sorted.length - 1];
   const first = sorted[0];
@@ -852,8 +911,14 @@ function summarizeClient(visits) {
     bump(languages, v.language);
   }
   const spanMs = Date.parse(last.recordedAt) - Date.parse(first.recordedAt);
+  const ips = new Set(sorted.map((v) => v.ip).filter(Boolean));
   return {
-    clientId: clientKey(last),
+    clientId: clientKey(last, confirmed),
+    identity: identityMode(last, confirmed),
+    identityNote:
+      identityMode(last, confirmed) === "device"
+        ? "cookie propriétaire : un appareil distinct, même si son IP change"
+        : "empreinte sans IP : des appareils identiques peuvent être confondus",
     visits: sorted.length,
     distinctDays: days.size,
     firstSeen: first.recordedAt || null,
@@ -861,6 +926,8 @@ function summarizeClient(visits) {
     returning: sorted.length > 1,
     daysBetweenFirstAndLast: Number.isFinite(spanMs) ? Number((spanMs / 86400000).toFixed(2)) : null,
     ip: last.ip || null,
+    distinctIps: ips.size,
+    rotatingIp: ips.size > 1,
     place: {
       city: geo.city || null,
       region: geo.region || null,
@@ -910,15 +977,20 @@ function summarizeClient(visits) {
 
 function buildVisitsFile(visits) {
   const list = Array.isArray(visits) ? visits : [];
+  // Un cookie ne compte que si le navigateur l'a représenté au moins une fois.
+  const confirmed = new Set();
+  for (const v of list) {
+    if (v && v.deviceConfirmed === true && isValidDeviceId(v.deviceId)) confirmed.add(v.deviceId);
+  }
   const groups = new Map();
   for (const v of list) {
     if (!v || typeof v !== "object") continue;
-    const key = clientKey(v);
+    const key = clientKey(v, confirmed);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(v);
   }
   const clients = [...groups.values()]
-    .map(summarizeClient)
+    .map((g) => summarizeClient(g, confirmed))
     .sort((a, b) => Date.parse(b.lastSeen || 0) - Date.parse(a.lastSeen || 0));
 
   const countries = {};
@@ -962,6 +1034,9 @@ function buildVisitsFile(visits) {
       lastVisitAt: stamps.length ? new Date(Math.max(...stamps)).toISOString() : null,
       gpsShared: clients.filter((c) => c.gpsShared).length,
       automated: clients.filter((c) => c.privacy.automated).length,
+      identifiedByCookie: clients.filter((c) => c.identity === "device").length,
+      identifiedByFingerprint: clients.filter((c) => c.identity === "fingerprint").length,
+      clientsWithRotatingIp: clients.filter((c) => c.rotatingIp).length,
       topCountries: topOf(countries),
       topCities: topOf(cities),
       topDevices: topOf(devices),
@@ -977,17 +1052,24 @@ function buildVisitsFile(visits) {
   };
 }
 
-async function recordHit(req, body) {
+async function recordHit(req, body, deviceId, deviceConfirmed) {
   const ip = clientIp(req);
   const visits = readVisits();
-  const recent = visits.find((v) => v.ip === ip && Date.now() - Date.parse(v.recordedAt) < 180000);
+  // Fusion des doublons quasi simultanés : on suit l'appareil quand on le
+  // connaît (l'IP peut changer d'une requête à l'autre sur mobile).
+  const recent = visits.find((v) => {
+    const fresh = Date.now() - Date.parse(v.recordedAt) < 180000;
+    if (!fresh) return false;
+    if (isValidDeviceId(deviceId)) return v.deviceId === deviceId;
+    return !v.deviceId && v.ip === ip;
+  });
   if (recent) {
-    mergeVisit(recent, body ? sanitizeVisit(body, req, ip, recent.geoIp) : null);
+    mergeVisit(recent, body ? sanitizeVisit(body, req, ip, recent.geoIp, deviceId, deviceConfirmed) : null);
     writeVisits(visits);
     return { visit: recent, total: visits.length, merged: true };
   }
   const geo = await geoFromIp(ip);
-  const visit = sanitizeVisit(body || { consent: true }, req, ip, geo);
+  const visit = sanitizeVisit(body || { consent: true }, req, ip, geo, deviceId, deviceConfirmed);
   visits.unshift(visit);
   const next = visits.slice(0, MAX_VISITS);
   writeVisits(next);
@@ -1035,7 +1117,8 @@ app.post("/api/visit", async (req, res) => {
   lastVisitByIp.set(ip, now);
 
   const geo = await geoFromIp(ip);
-  const visit = sanitizeVisit(req.body, req, ip, geo);
+  const { deviceId, isNew } = ensureDeviceId(req, res);
+  const visit = sanitizeVisit(req.body, req, ip, geo, deviceId, !isNew);
   const visits = readVisits();
   visits.unshift(visit);
   const saved = writeVisits(visits.slice(0, MAX_VISITS));

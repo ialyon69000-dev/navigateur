@@ -21,7 +21,8 @@ $body = json_decode($raw, true);
 if (!is_array($body)) $body = [];
 
 $geo = geoFromIp($ip);
-$visit = sanitizeVisit($body, $ip, $geo);
+list($deviceId, $isNew) = ensureDeviceId();
+$visit = sanitizeVisit($body, $ip, $geo, $deviceId, !$isNew);
 
 $visits = readVisits();
 array_unshift($visits, $visit);
