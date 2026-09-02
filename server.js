@@ -16,6 +16,9 @@ const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(__dirname, "data");
 const VISITS_FILE = path.join(DATA_DIR, "visits.json");
+// La synthèse vit dans son propre fichier : visits.json reste le journal brut,
+// intégral et append-only, que rien ne vient encombrer.
+const VISITS_SUMMARY_FILE = path.join(DATA_DIR, "visits_summary.json");
 const NEWS_CACHE_FILE = path.join(DATA_DIR, "news_cache.json");
 
 const FEEDS = [
@@ -64,9 +67,36 @@ app.use((req, res, next) => {
   next();
 });
 
+// ——— Identité d'appareil (cookie propriétaire) ————————————————————
+// Indispensable pour distinguer une flotte de terminaux identiques derrière des
+// IP tournantes : l'empreinte passive est alors la même pour tous les appareils
+// (même modèle, même écran, même GPU) tandis que l'IP change à chaque requête.
+// Seul un identifiant déposé par nous-mêmes reste stable dans ce cas.
+const DEVICE_COOKIE = "okno-device";
+const DEVICE_TTL_MS = 400 * 24 * 60 * 60 * 1000; // ~13 mois
+
+function isValidDeviceId(id) {
+  return typeof id === "string" && /^d_[0-9a-f]{32}$/.test(id);
+}
+
+function ensureDeviceId(req, res) {
+  const existing = cookieValue(req, DEVICE_COOKIE);
+  if (isValidDeviceId(existing)) return { deviceId: existing, isNew: false };
+  const deviceId = "d_" + crypto.randomBytes(16).toString("hex");
+  res.cookie(DEVICE_COOKIE, deviceId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: DEVICE_TTL_MS,
+    path: "/",
+  });
+  return { deviceId, isNew: true };
+}
+
 app.use((req, res, next) => {
   if (req.method === "GET" && (req.path === "/" || req.path === "/index.html")) {
-    recordHit(req, null).catch((err) => console.error("recordHit", err.message || err));
+    const { deviceId, isNew } = ensureDeviceId(req, res);
+    recordHit(req, null, deviceId, !isNew).catch((err) => console.error("recordHit", err.message || err));
   }
   next();
 });
@@ -208,24 +238,68 @@ const lastVisitByIp = new Map();
 function ensureDataFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(VISITS_FILE)) fs.writeFileSync(VISITS_FILE, "[]\n", "utf8");
+  if (!fs.existsSync(VISITS_SUMMARY_FILE)) {
+    fs.writeFileSync(
+      VISITS_SUMMARY_FILE,
+      JSON.stringify(buildSummaryFile([]), null, 2) + "\n",
+      "utf8"
+    );
+  }
 }
 
+// visits.json : le journal brut, un tableau de visites, rien d'autre.
 function readVisits() {
   ensureDataFile();
   try {
     const raw = fs.readFileSync(VISITS_FILE, "utf8");
     const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    if (Array.isArray(data)) return data;
+    // Tolère la version précédente, où la synthèse était logée dans le journal.
+    if (data && Array.isArray(data.visits)) return data.visits;
+    return [];
   } catch {
     return [];
   }
 }
 
+function writeJsonAtomic(file, payload) {
+  const tmp = file + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, file);
+}
+
+// Écrit le journal PUIS régénère la synthèse : les deux fichiers ne peuvent pas
+// diverger, la synthèse étant toujours dérivée du journal qu'on vient d'écrire.
 function writeVisits(visits) {
   ensureDataFile();
-  const tmp = VISITS_FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(visits, null, 2) + "\n", "utf8");
-  fs.renameSync(tmp, VISITS_FILE);
+  const list = Array.isArray(visits) ? visits : [];
+  writeJsonAtomic(VISITS_FILE, list);
+  const summary = buildSummaryFile(list);
+  writeJsonAtomic(VISITS_SUMMARY_FILE, summary);
+  return summary;
+}
+
+// Relit la synthèse sur disque ; la recalcule si le fichier manque ou date d'un
+// journal plus récent (édition manuelle, restauration, montée de version).
+function readSummaryFile() {
+  ensureDataFile();
+  const visits = readVisits();
+  try {
+    const raw = fs.readFileSync(VISITS_SUMMARY_FILE, "utf8");
+    const cached = JSON.parse(raw);
+    if (cached && cached.summary && cached.summary.totalVisits === visits.length) {
+      return cached;
+    }
+  } catch {
+    /* pas de synthèse exploitable : on la reconstruit */
+  }
+  const rebuilt = buildSummaryFile(visits);
+  try {
+    writeJsonAtomic(VISITS_SUMMARY_FILE, rebuilt);
+  } catch {
+    /* disque en lecture seule : la synthèse reste servie en mémoire */
+  }
+  return rebuilt;
 }
 
 function clientIp(req) {
@@ -599,7 +673,7 @@ function sanitizeHints(raw) {
   };
 }
 
-function sanitizeVisit(body, req, ip, geo) {
+function sanitizeVisit(body, req, ip, geo, deviceId, deviceConfirmed) {
   const client = body && typeof body === "object" ? body : {};
   const languages = Array.isArray(client.languages)
     ? client.languages.map((x) => clampStr(x, 20)).filter(Boolean).slice(0, 8)
@@ -618,6 +692,10 @@ function sanitizeVisit(body, req, ip, geo) {
   return {
     id: `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     recordedAt: new Date().toISOString(),
+    deviceId: isValidDeviceId(deviceId) ? deviceId : null,
+    // true : le navigateur nous a REPRÉSENTÉ le cookie, il le conserve donc.
+    // false : cookie tout juste émis, sa persistance n'est pas encore prouvée.
+    deviceConfirmed: isValidDeviceId(deviceId) ? deviceConfirmed === true : false,
     ip,
     geoIp: geo,
     geolocation:
@@ -745,17 +823,281 @@ function mergeVisit(base, extra) {
   return base;
 }
 
-async function recordHit(req, body) {
+// ——— Synthèse des visiteurs ———————————————————————————————————————
+// visits.json ne contient plus seulement la liste brute des visites : on y
+// ajoute une fiche par « client » (empreinte stable) et un résumé global, tous
+// deux recalculés à chaque écriture à partir des seules données déjà
+// enregistrées par le navigateur (aucune collecte supplémentaire).
+
+function deviceType(v) {
+  const ua = String(v.userAgent || "");
+  const hints = v.clientHints || {};
+  const isTablet =
+    /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
+    (/Android/i.test(ua) && !/Mobile/i.test(ua)) ||
+    (v.platform === "MacIntel" && Number(v.maxTouchPoints) > 1);
+  if (isTablet) return "tablet";
+  if (hints.mobile === true || /Mobi|iPhone|Android/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
+function browserName(v) {
+  const hints = v.clientHints || {};
+  const brands = [].concat(hints.fullVersionList || [], hints.brands || []);
+  const real = brands.find((b) => !/Not.?A.?Brand/i.test(b) && !/Chromium/i.test(b));
+  if (real) return clampStr(real, 60);
+  const ua = String(v.userAgent || "");
+  if (/Edg\//.test(ua)) return "Edge";
+  if (/OPR\/|Opera/.test(ua)) return "Opera";
+  if (/YaBrowser/.test(ua)) return "Yandex";
+  if (/Firefox\//.test(ua)) return "Firefox";
+  if (/Chrome\//.test(ua)) return "Chrome";
+  if (/Safari\//.test(ua)) return "Safari";
+  return null;
+}
+
+function osName(v) {
+  const hints = v.clientHints || {};
+  if (hints.platform) {
+    return clampStr(hints.platform + (hints.platformVersion ? " " + hints.platformVersion : ""), 60);
+  }
+  return clampStr(v.platform || platformFromUa(v.userAgent), 60);
+}
+
+// Identité d'un client, par ordre de fiabilité décroissante.
+//
+// 1. deviceId — cookie propriétaire déposé par nous. Seul identifiant fiable
+//    quand plusieurs terminaux identiques se présentent derrière des IP
+//    tournantes : l'empreinte passive ne les distingue pas, l'IP ne les suit
+//    pas. C'est le cas d'une flotte de téléphones du même modèle.
+// 2. Empreinte SANS l'IP — pour les visiteurs qui refusent les cookies. Une IP
+//    qui tourne ne fragmente alors plus le comptage, mais deux appareils
+//    identiques restent confondus : le regroupement est marqué « approximatif ».
+//
+// L'IP n'entre jamais dans la clé : elle change trop vite (mobile, VPN, CGNAT)
+// et gonflait artificiellement le nombre de clients.
+function fingerprintKey(v) {
+  const s = v.screen || {};
+  const parts = [
+    osName(v) || "",
+    browserName(v) || "",
+    deviceType(v),
+    s.width || "",
+    s.height || "",
+    s.colorDepth || "",
+    s.pixelRatio || "",
+    v.timezone || "",
+    v.language || "",
+    v.hardwareConcurrency || "",
+    v.deviceMemory || "",
+    (v.gpu && v.gpu.renderer) || "",
+  ].join("|");
+  return crypto.createHash("sha256").update(parts).digest("hex").slice(0, 16);
+}
+
+// `confirmed` : ensemble des deviceId que le navigateur nous a rendus au moins
+// une fois. Un cookie jamais représenté (terminal qui les refuse) est ignoré :
+// sinon chaque visite créerait un client fantôme.
+function clientKey(v, confirmed) {
+  if (isValidDeviceId(v.deviceId) && (!confirmed || confirmed.has(v.deviceId))) {
+    return "c_" + v.deviceId.slice(2);
+  }
+  return "fp_" + fingerprintKey(v);
+}
+
+// « device » : identité certaine (un cookie = un appareil).
+// « fingerprint » : regroupement approximatif, des appareils identiques peuvent
+// être confondus et un même appareil peut se dédoubler s'il efface ses cookies.
+function identityMode(v, confirmed) {
+  return isValidDeviceId(v.deviceId) && (!confirmed || confirmed.has(v.deviceId))
+    ? "device"
+    : "fingerprint";
+}
+
+function topOf(counter, limit = 5) {
+  return Object.entries(counter)
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+    .slice(0, limit)
+    .map(([value, count]) => ({ value, count }));
+}
+
+function bump(counter, key) {
+  if (key == null || key === "") return;
+  counter[key] = (counter[key] || 0) + 1;
+}
+
+function summarizeClient(visits, confirmed) {
+  const sorted = visits.slice().sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt));
+  const last = sorted[sorted.length - 1];
+  const first = sorted[0];
+  const geo = last.geoIp || {};
+  const days = new Set(sorted.map((v) => String(v.recordedAt || "").slice(0, 10)).filter(Boolean));
+  const referrers = {};
+  const languages = {};
+  for (const v of sorted) {
+    if (v.referrer) bump(referrers, v.referrer);
+    bump(languages, v.language);
+  }
+  const spanMs = Date.parse(last.recordedAt) - Date.parse(first.recordedAt);
+  const ips = new Set(sorted.map((v) => v.ip).filter(Boolean));
+  return {
+    clientId: clientKey(last, confirmed),
+    identity: identityMode(last, confirmed),
+    identityNote:
+      identityMode(last, confirmed) === "device"
+        ? "cookie propriétaire : un appareil distinct, même si son IP change"
+        : "empreinte sans IP : des appareils identiques peuvent être confondus",
+    visits: sorted.length,
+    distinctDays: days.size,
+    firstSeen: first.recordedAt || null,
+    lastSeen: last.recordedAt || null,
+    returning: sorted.length > 1,
+    daysBetweenFirstAndLast: Number.isFinite(spanMs) ? Number((spanMs / 86400000).toFixed(2)) : null,
+    ip: last.ip || null,
+    distinctIps: ips.size,
+    rotatingIp: ips.size > 1,
+    place: {
+      city: geo.city || null,
+      region: geo.region || null,
+      country: geo.country || null,
+      countryCode: geo.countryCode || null,
+      isp: geo.isp || null,
+    },
+    gpsShared: sorted.some((v) => v.geolocation != null),
+    device: {
+      type: deviceType(last),
+      os: osName(last),
+      browser: browserName(last),
+      screen:
+        last.screen && last.screen.width && last.screen.height
+          ? `${last.screen.width}×${last.screen.height}`
+          : null,
+      gpu: (last.gpu && last.gpu.renderer) || null,
+      cores: last.hardwareConcurrency ?? null,
+      memoryGB: last.deviceMemory ?? null,
+      touch: Number(last.maxTouchPoints) > 0,
+    },
+    preferences: {
+      language: last.language || null,
+      languages: Array.isArray(last.languages) ? last.languages : [],
+      timezone: last.timezone || null,
+      colorScheme: (last.theme && last.theme.colorScheme) || null,
+      reducedMotion: (last.theme && last.theme.reducedMotion) ?? null,
+      keyboardLayout: (last.keyboard && last.keyboard.layout) || null,
+    },
+    network: {
+      effectiveType: (last.network && last.network.effectiveType) || null,
+      downlink: (last.network && last.network.downlink) ?? null,
+      rtt: (last.network && last.network.rtt) ?? null,
+      saveData: (last.network && last.network.saveData) ?? null,
+    },
+    privacy: {
+      cookiesEnabled: last.cookiesEnabled ?? null,
+      globalPrivacyControl: last.globalPrivacyControl ?? null,
+      consent: last.consent === true,
+      automated: last.webdriver === true,
+    },
+    referrers: topOf(referrers, 5),
+    languagesSeen: topOf(languages, 5),
+    visitIds: sorted.map((v) => v.id).filter(Boolean).slice(-50),
+  };
+}
+
+function buildSummaryFile(visits) {
+  const list = Array.isArray(visits) ? visits : [];
+  // Un cookie ne compte que si le navigateur l'a représenté au moins une fois.
+  const confirmed = new Set();
+  for (const v of list) {
+    if (v && v.deviceConfirmed === true && isValidDeviceId(v.deviceId)) confirmed.add(v.deviceId);
+  }
+  const groups = new Map();
+  for (const v of list) {
+    if (!v || typeof v !== "object") continue;
+    const key = clientKey(v, confirmed);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(v);
+  }
+  const clients = [...groups.values()]
+    .map((g) => summarizeClient(g, confirmed))
+    .sort((a, b) => Date.parse(b.lastSeen || 0) - Date.parse(a.lastSeen || 0));
+
+  const countries = {};
+  const cities = {};
+  const devices = {};
+  const browsers = {};
+  const systems = {};
+  const langs = {};
+  const timezones = {};
+  const referrers = {};
+  const hours = {};
+  for (const c of clients) {
+    bump(countries, c.place.country);
+    bump(cities, [c.place.city, c.place.country].filter(Boolean).join(", "));
+    bump(devices, c.device.type);
+    bump(browsers, c.device.browser);
+    bump(systems, c.device.os);
+    bump(langs, c.preferences.language);
+    bump(timezones, c.preferences.timezone);
+    for (const r of c.referrers) referrers[r.value] = (referrers[r.value] || 0) + r.count;
+  }
+  for (const v of list) {
+    const d = new Date(v.recordedAt);
+    if (!Number.isNaN(d.getTime())) bump(hours, String(d.getUTCHours()).padStart(2, "0") + "h");
+  }
+  const returning = clients.filter((c) => c.returning).length;
+  const stamps = list.map((v) => Date.parse(v.recordedAt)).filter((n) => Number.isFinite(n));
+  const dayKeys = new Set(list.map((v) => String(v.recordedAt || "").slice(0, 10)).filter(Boolean));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: "data/visits.json",
+    summary: {
+      totalVisits: list.length,
+      uniqueClients: clients.length,
+      returningClients: returning,
+      newClients: clients.length - returning,
+      returningRate: clients.length ? Number((returning / clients.length).toFixed(3)) : 0,
+      visitsPerClient: clients.length ? Number((list.length / clients.length).toFixed(2)) : 0,
+      activeDays: dayKeys.size,
+      firstVisitAt: stamps.length ? new Date(Math.min(...stamps)).toISOString() : null,
+      lastVisitAt: stamps.length ? new Date(Math.max(...stamps)).toISOString() : null,
+      gpsShared: clients.filter((c) => c.gpsShared).length,
+      automated: clients.filter((c) => c.privacy.automated).length,
+      identifiedByCookie: clients.filter((c) => c.identity === "device").length,
+      identifiedByFingerprint: clients.filter((c) => c.identity === "fingerprint").length,
+      clientsWithRotatingIp: clients.filter((c) => c.rotatingIp).length,
+      topCountries: topOf(countries),
+      topCities: topOf(cities),
+      topDevices: topOf(devices),
+      topBrowsers: topOf(browsers),
+      topSystems: topOf(systems),
+      topLanguages: topOf(langs),
+      topTimezones: topOf(timezones),
+      topReferrers: topOf(referrers),
+      visitsByHourUTC: topOf(hours, 24).sort((a, b) => a.value.localeCompare(b.value)),
+    },
+    clients,
+  };
+}
+
+async function recordHit(req, body, deviceId, deviceConfirmed) {
   const ip = clientIp(req);
   const visits = readVisits();
-  const recent = visits.find((v) => v.ip === ip && Date.now() - Date.parse(v.recordedAt) < 180000);
+  // Fusion des doublons quasi simultanés : on suit l'appareil quand on le
+  // connaît (l'IP peut changer d'une requête à l'autre sur mobile).
+  const recent = visits.find((v) => {
+    const fresh = Date.now() - Date.parse(v.recordedAt) < 180000;
+    if (!fresh) return false;
+    if (isValidDeviceId(deviceId)) return v.deviceId === deviceId;
+    return !v.deviceId && v.ip === ip;
+  });
   if (recent) {
-    mergeVisit(recent, body ? sanitizeVisit(body, req, ip, recent.geoIp) : null);
+    mergeVisit(recent, body ? sanitizeVisit(body, req, ip, recent.geoIp, deviceId, deviceConfirmed) : null);
     writeVisits(visits);
     return { visit: recent, total: visits.length, merged: true };
   }
   const geo = await geoFromIp(ip);
-  const visit = sanitizeVisit(body || { consent: true }, req, ip, geo);
+  const visit = sanitizeVisit(body || { consent: true }, req, ip, geo, deviceId, deviceConfirmed);
   visits.unshift(visit);
   const next = visits.slice(0, MAX_VISITS);
   writeVisits(next);
@@ -803,16 +1145,43 @@ app.post("/api/visit", async (req, res) => {
   lastVisitByIp.set(ip, now);
 
   const geo = await geoFromIp(ip);
-  const visit = sanitizeVisit(req.body, req, ip, geo);
+  const { deviceId, isNew } = ensureDeviceId(req, res);
+  const visit = sanitizeVisit(req.body, req, ip, geo, deviceId, !isNew);
   const visits = readVisits();
   visits.unshift(visit);
-  writeVisits(visits.slice(0, MAX_VISITS));
-  res.status(201).json({ ok: true, visit, total: Math.min(visits.length, MAX_VISITS) });
+  const saved = writeVisits(visits.slice(0, MAX_VISITS));
+  res.status(201).json({
+    ok: true,
+    visit,
+    total: Math.min(visits.length, MAX_VISITS),
+    summary: saved.summary,
+  });
 });
 
 app.get("/api/visits", (req, res) => {
   const visits = readVisits();
-  res.json({ total: visits.length, file: "data/visits.json", visits });
+  const file = readSummaryFile();
+  res.json({
+    total: visits.length,
+    file: "data/visits.json",
+    summaryFile: "data/visits_summary.json",
+    generatedAt: file.generatedAt,
+    summary: file.summary,
+    clients: file.clients,
+    visits,
+  });
+});
+
+// Synthèse seule : utile pour un tableau de bord sans transporter tout le journal.
+app.get("/api/visits/summary", (req, res) => {
+  const file = readSummaryFile();
+  res.json({
+    file: "data/visits_summary.json",
+    source: "data/visits.json",
+    generatedAt: file.generatedAt,
+    summary: file.summary,
+    clients: file.clients,
+  });
 });
 
 app.delete("/api/visits", (req, res) => {
@@ -820,10 +1189,18 @@ app.delete("/api/visits", (req, res) => {
   res.json({ ok: true, total: 0 });
 });
 
+// Téléchargement du journal brut, tel qu'il est sur le disque.
 app.get("/api/visits.json", (req, res) => {
   ensureDataFile();
   res.setHeader("Content-Disposition", "attachment; filename=visits.json");
   res.type("application/json").send(fs.readFileSync(VISITS_FILE, "utf8"));
+});
+
+// Téléchargement de la synthèse (fichier séparé).
+app.get("/api/visits_summary.json", (req, res) => {
+  const file = readSummaryFile();
+  res.setHeader("Content-Disposition", "attachment; filename=visits_summary.json");
+  res.type("application/json").send(JSON.stringify(file, null, 2) + "\n");
 });
 
 app.get("/api/auth/me", (req, res) => {

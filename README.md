@@ -51,6 +51,140 @@ L'utilisateur lit la langue qu'il a choisie (repli sur le russe si la version
 manque). Les brouillons (`active: false`) ne quittent jamais le serveur.
 Stockage : `data/messages.json` et `data/dispatches.json` (mêmes fichiers côté PHP).
 
+## Journal et synthèse : deux fichiers
+
+| Fichier | Rôle | Forme |
+|---------|------|-------|
+| `data/visits.json` | **le journal brut, intégral** — une entrée par visite, rien d'agrégé, rien de dédupliqué (toutes les IP traversées sont conservées) | tableau |
+| `data/visits_summary.json` | **la synthèse** — dérivée du journal, une fiche par client + vue d'ensemble | objet |
+
+La synthèse est régénérée à chaque écriture du journal : les deux fichiers ne
+peuvent pas diverger. Si elle est absente ou ne correspond plus au journal
+(édition manuelle, restauration), elle est reconstruite à la lecture suivante.
+Elle ne recopie jamais les visites : elle référence sa source.
+
+Tout est calculé à partir des **seules** données déjà envoyées par le
+navigateur — aucune collecte supplémentaire.
+
+### `data/visits.json` — le journal
+
+```jsonc
+[
+  {
+    "id": "v_m0abc_1f2e3d",
+    "recordedAt": "2026-09-01T20:19:42.700Z",
+    "deviceId": "d_…", "deviceConfirmed": true,
+    "ip": "85.10.1.13",              // l'IP réelle de CETTE visite
+    "geoIp": { "city": "Moscow", "country": "Russia", "isp": "…" },
+    "language": "ru", "timezone": "Europe/Moscow",
+    "screen": { "width": 412, "height": 915, "…": "…" },
+    "userAgent": "…", "clientHints": { "…": "…" },
+    "gpu": {}, "network": {}, "theme": {}, "voices": {}, "storage": {},
+    "referrer": "https://ya.ru/", "consent": true
+  }
+  // … une entrée par visite, jusqu'à MAX_VISITS (800)
+]
+```
+
+### `data/visits_summary.json` — la synthèse
+
+```jsonc
+{
+  "generatedAt": "2026-09-01T20:19:42.700Z",
+  "source": "data/visits.json",
+  "summary": {                 // vue d'ensemble
+    "totalVisits": 42, "uniqueClients": 17,
+    "returningClients": 6, "newClients": 11,
+    "returningRate": 0.353, "visitsPerClient": 2.47, "activeDays": 5,
+    "firstVisitAt": "…", "lastVisitAt": "…",
+    "gpsShared": 1, "automated": 0,
+    "identifiedByCookie": 14,        // comptage exact
+    "identifiedByFingerprint": 3,    // comptage approximatif
+    "clientsWithRotatingIp": 5,      // appareils vus depuis plusieurs IP
+    "topCountries": [{ "value": "Russia", "count": 9 }],
+    "topCities": [], "topDevices": [], "topBrowsers": [], "topSystems": [],
+    "topLanguages": [], "topTimezones": [], "topReferrers": [],
+    "visitsByHourUTC": [{ "value": "20h", "count": 4 }]
+  },
+  "clients": [                 // une fiche par visiteur
+    {
+      "clientId": "c_33baca6a20fcf988",
+      "identity": "device",          // "device" (exact) | "fingerprint" (approx.)
+      "identityNote": "cookie propriétaire : un appareil distinct, même si son IP change",
+      "visits": 3, "distinctDays": 2, "returning": true,
+      "distinctIps": 7, "rotatingIp": true,
+      "firstSeen": "…", "lastSeen": "…", "daysBetweenFirstAndLast": 1.2,
+      "ip": "203.0.113.4",
+      "place": { "city": "Moscow", "region": "…", "country": "Russia", "isp": "…" },
+      "device": { "type": "desktop", "os": "Windows 10/11", "browser": "Chrome 120",
+                  "screen": "1920×1080", "gpu": "…", "cores": 8, "memoryGB": 8, "touch": false },
+      "preferences": { "language": "ru", "timezone": "Europe/Moscow",
+                       "colorScheme": "dark", "keyboardLayout": "…" },
+      "network": { "effectiveType": "4g", "downlink": 10, "rtt": 50 },
+      "privacy": { "cookiesEnabled": true, "globalPrivacyControl": false,
+                   "consent": true, "automated": false },
+      "referrers": [{ "value": "https://ya.ru/", "count": 2 }],
+      "gpsShared": false,
+      "visitIds": ["v_…"]
+    }
+  ]
+}
+```
+
+### Comment un « client » est identifié
+
+Deux régimes, et le fichier dit toujours lequel s'applique (`identity`) :
+
+| `identity` | `clientId` | Base | Fiabilité |
+|-----------|-----------|------|-----------|
+| `device` | `c_…` | cookie propriétaire `okno-device` (httpOnly, ~13 mois) | **exacte** — un appareil distinct, même si son IP change |
+| `fingerprint` | `fp_…` | empreinte **sans IP** (système, navigateur, écran, GPU, langue, fuseau, cœurs, mémoire) | **approximative** — des appareils identiques peuvent être confondus |
+
+**L'IP n'entre jamais dans l'identité.** Elle change trop vite (mobile, VPN,
+CGNAT, proxys tournants) et fragmentait le comptage : un même téléphone
+apparaissait autant de fois qu'il changeait d'adresse. Elle reste consultable
+via `distinctIps` / `rotatingIp`, qui mesurent justement cette rotation.
+
+Un cookie n'est pris en compte qu'une fois **représenté** par le navigateur
+(`deviceConfirmed`). Un terminal qui refuse les cookies ne crée donc pas un
+client fantôme à chaque visite : il bascule en `fingerprint`.
+
+#### Cas d'une flotte de terminaux identiques à IP tournantes
+
+C'est le scénario qui met en défaut toute empreinte passive : le matériel étant
+identique, l'empreinte ne distingue pas les postes ; l'IP changeant sans cesse,
+elle ne les suit pas.
+
+- **Avec cookies** (cas normal) : comptage **exact**, chaque terminal est un
+  client, quel que soit le nombre d'IP traversées. Couvert par
+  `tests/visits-fleet.test.mjs`.
+- **Sans cookies** : les terminaux identiques **fusionnent** en un seul client.
+  C'est une limite intrinsèque, pas un réglage. Le fichier ne le masque pas :
+  ces clients sont marqués `fingerprint` et comptés dans
+  `identifiedByFingerprint`.
+
+Pour une distinction certaine sans cookie, il faut un identifiant explicite
+(paramètre d'URL par terminal, compte connecté, en-tête applicatif) — aucune
+donnée passive du navigateur ne peut y suppléer.
+
+Compatibilité : un ancien `visits.json` — tableau brut, ou version fusionnée
+`{ summary, clients, visits }` — est toujours lu ; le journal reprend sa forme
+de tableau et la synthèse repart dans son fichier dès l'écriture suivante,
+sans perte de visites.
+
+| Route | Effet |
+|-------|-------|
+| `GET /api/visits` | journal + `summary` + `clients` |
+| `GET /api/visits/summary` (PHP : `api/visits.php?summary=1`) | synthèse seule, sans le journal |
+| `GET /api/visits.json` | télécharge **le journal brut** |
+| `GET /api/visits_summary.json` (PHP : `api/visits_summary.php`) | télécharge **la synthèse** |
+| `POST /api/visit` | enregistre la visite et renvoie la `summary` à jour |
+| `DELETE /api/visits` | vide le journal et remet la synthèse à zéro |
+
+La page **Лаборатория / Laboratory** affiche cette synthèse : cartes de
+totaux, classements (pays, appareils, navigateurs, systèmes, langues,
+référents) et un tableau des clients.
+
 ## Deux versions
 
 ### 1. Version Node.js (originale) — `server.js` + `public/`
@@ -58,7 +192,7 @@ Stockage : `data/messages.json` et `data/dispatches.json` (mêmes fichiers côt�
 - APIs : `/api/me`, `/api/news`, `/api/visit`, `/api/visits`, `/api/health`,
   `/api/messages`, `/api/dispatches` (lecture + écriture admin)
 - Authentification : `/api/auth/login|register|me|logout`, tableau de bord `/dashboard.html`
-- Stockage `data/` (visits.json, users.json, sessions.json, dispatches.json, messages.json, news_cache.json)
+- Stockage `data/` (visits.json, visits_summary.json, users.json, sessions.json, dispatches.json, messages.json, news_cache.json)
 - `render.yaml` prêt pour Render.com
 
 **Lancer :**

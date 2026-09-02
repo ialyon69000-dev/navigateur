@@ -970,3 +970,50 @@ tr:hover td { background: #f0eadc; }
   color: var(--ink-2);
   font-size: 0.86rem;
 }
+
+/* ——— Лаборатория : сводка по посетителям ——— */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin: 0.9rem 0 1.2rem;
+}
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.summary-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mute);
+}
+.summary-value {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  color: var(--crimson-deep);
+}
+.summary-tops {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+.summary-top h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mute);
+}
+.summary-top ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+.summary-top li { margin-bottom: 0.15rem; }

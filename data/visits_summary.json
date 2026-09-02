@@ -1,0 +1,30 @@
+{
+  "generatedAt": null,
+  "source": "data/visits.json",
+  "summary": {
+    "totalVisits": 0,
+    "uniqueClients": 0,
+    "returningClients": 0,
+    "newClients": 0,
+    "returningRate": 0,
+    "visitsPerClient": 0,
+    "activeDays": 0,
+    "firstVisitAt": null,
+    "lastVisitAt": null,
+    "gpsShared": 0,
+    "automated": 0,
+    "identifiedByCookie": 0,
+    "identifiedByFingerprint": 0,
+    "clientsWithRotatingIp": 0,
+    "topCountries": [],
+    "topCities": [],
+    "topDevices": [],
+    "topBrowsers": [],
+    "topSystems": [],
+    "topLanguages": [],
+    "topTimezones": [],
+    "topReferrers": [],
+    "visitsByHourUTC": []
+  },
+  "clients": []
+}
