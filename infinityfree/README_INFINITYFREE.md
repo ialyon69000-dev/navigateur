@@ -8,16 +8,19 @@ portage 100% PHP dans `infinityfree/htdocs/`.
 ## Contenu de `infinityfree/htdocs/` (à mettre dans `htdocs/` du serveur)
 
 ```
-index.html, styles.css, app.js, i18n.js        frontend (drapeaux RU/EN, zone connexion)
+index.php, styles.css, app.js, i18n.js        frontend (drapeaux RU/EN, zone connexion) ;
+                                               index.php pré-rend les dépêches côté serveur
 confidentialite.html, contacts.html,
-informations-juridiques.html, laboratoire.html pages statiques
+informations-juridiques.html, laboratoire.html pages statiques publiques (indexables)
 auth/login.html, auth/register.html,
-auth/dispatches.html, auth/auth.js             connexion / inscription / dépêches
-dashboard.html, dashboard.js                   tableau de bord (protégé par session)
+auth/dispatches.html, auth/auth.js             connexion / inscription / dépêches (noindex)
+dashboard.html, dashboard.js                   tableau de bord (protégé par session, noindex)
 dispatches.js                                  liste des dépêches
-vk.html, log.php                               exercice de sensibilisation au phishing
+vk.html, log.php                               exercice de sensibilisation au phishing (noindex)
 images/ru.svg, images/en.svg                   drapeaux du sélecteur de langue
-.htaccess                                      réécritures /api/* + en-têtes sécurité
+seo-lib.php                                    fonctions SEO partagées (JSON-LD, pré-rendu)
+robots.php, sitemap.php, llms.php              servis sous /robots.txt, /sitemap.xml, /llms.txt
+.htaccess                                      réécritures /api/* + robots/sitemap/llms + en-têtes
 api/
   _common.php          fonctions partagées (IP, geo ipwho.is, visits avec flock)
   me.php               GET  /api/me
@@ -214,11 +217,45 @@ Workflow « Refresh OKNO news cache » (`workflow_dispatch`) : régénère
 décodage robuste, et le committe sur la branche. Sur InfinityFree, le cache se
 régénère aussi tout seul toutes les 5 min en arrière-plan.
 
+## Référencement : moteurs de recherche et LLM
+
+La home était en `noindex` et ses dépêches 100 % rendues en JavaScript :
+les robots (dont les aspirateurs de grands modèles de langage) ne voyaient
+qu'une page vide. Optimisations apportées :
+
+- **`index.php` remplace `index.html`** (`.htaccess` met `DirectoryIndex index.php`) :
+  le serveur **pré-rend les dépêches** dans le HTML (il lit `data/news_cache.json`),
+  avec un `<h1>` et une balise `<article>` par dépêche. Les robots et les LLM
+  reçoivent donc tout le texte ; `app.js` remplace ensuite ce bloc par l'édition
+  mise en forme dès qu'il a chargé `/api/news`.
+- **JSON-LD** (`schema.org`) sur la home : `NewsMediaOrganization` + `WebSite`
+  (avec `SearchAction`) + `ItemList` de `NewsArticle` (titre, source, date, image).
+- **`/robots.txt`** (généré par `robots.php`) : autorise les pages publiques,
+  interdit `auth/`, `dashboard`, `data/`, `api/`, l'exercice phishing, et
+  **autorise explicitement les aspirateurs LLM/IA** (GPTBot, OAI-SearchBot,
+  ClaudeBot, PerplexityBot, Google-Extended, CCBot, Amazonbot, Bytespider…).
+- **`/sitemap.xml`** (généré par `sitemap.php`) : liste des pages publiques avec
+  `lastmod` (fraîcheur du cache de dépêches pour la home).
+- **`/llms.txt`** (généré par `llms.php` ; `?full=1` ajoute les titres des
+  dernières dépêches) : résumé en Markdown clair du site, dédié aux LLM.
+- **Méta** : `robots: index, follow`, `description`, `canonical`, Open Graph et
+  Twitter Card sur la home et les pages publiques. Restent en `noindex` :
+  login, register, dashboard, dispatches, et l'exercice `vk.html`.
+
+Les URL absolues des `canonical` / `sitemap` / `llms.txt` sont calculées depuis
+la requête (`seo_base_url()`) : elles sont correctes quel que soit le domaine.
+En local (`php -S`) le `.htaccess` ne réécrit pas — appeler directement
+`/robots.php`, `/sitemap.php`, `/llms.php`.
+
 ## Test en local
 
 ```bash
 cd infinityfree/htdocs
 php -S localhost:8000
+# http://localhost:8000/                 → index.php (dépêches pré-rendues + JSON-LD)
+# http://localhost:8000/robots.php       → robots.txt (en local, /robots.txt ne marche pas)
+# http://localhost:8000/sitemap.php      → sitemap.xml
+# http://localhost:8000/llms.php         → llms.txt (?full=1 avec les dépêches)
 # http://localhost:8000/api/health
 # http://localhost:8000/auth/login.html
 ```

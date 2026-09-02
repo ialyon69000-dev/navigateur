@@ -1,5 +1,18 @@
 # InfinityFree - Rewrite API to PHP files + Security headers
 RewriteEngine On
+
+# Page d'accueil : la version PHP (pré-rendu pour les robots / LLM) prime
+DirectoryIndex index.php index.html
+
+# Fichiers d'indexation générés dynamiquement (URL absolue correcte quel que
+# soit le domaine) : /robots.txt, /sitemap.xml, /llms.txt
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^robots\.txt$ robots.php [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^llms\.txt$ llms.php [L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^api/me$ api/me.php [L,QSA]

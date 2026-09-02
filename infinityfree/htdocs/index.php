@@ -1,16 +1,44 @@
-<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/seo-lib.php';
+$newsItems = seo_news_items(60);
+$baseUrl = seo_base_url();
+// Pré-rendu pour les robots qui n'exécutent pas JavaScript (moteurs, LLM) :
+// le texte complet des dépêches est présent dans le HTML servi ; app.js le
+// remplace par l'édition mise en forme dès qu'il a chargé /api/news.
+$newsHtml = seo_news_html($newsItems, 40);
+$jsonLd = seo_home_jsonld($newsItems, 30);
+?><!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ОКНО — Revue internationale</title>
-  <meta name="description" content="Les unes des grandes rédactions russes, réunies en une édition." />
-  <meta name="robots" content="noindex, nofollow" />
+  <title>ОКНО — Revue internationale : les unes de la presse russe</title>
+  <meta name="description" content="ОКНО (OKNO) réunit en une seule édition les unes des grandes rédactions russes — ТАСС, РИА Новости, Лента.ру, Коммерсантъ, Известия, МК, Газета.Ru. Actualité russe et internationale, en russe et en anglais." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <link rel="canonical" href="<?php echo seo_h($baseUrl . '/'); ?>" />
+
+  <!-- Open Graph (partage + LLM) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ОКНО — Revue internationale" />
+  <meta property="og:title" content="ОКНО — les unes de la presse russe en une édition" />
+  <meta property="og:description" content="ТАСС, РИА Новости, Лента.ру, Коммерсантъ, Известия, МК, Газета.Ru — les unes des grandes rédactions russes, réunies en une édition bilingue (russe/anglais)." />
+  <meta property="og:url" content="<?php echo seo_h($baseUrl . '/'); ?>" />
+  <meta property="og:locale" content="ru_RU" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="ОКНО — Revue internationale" />
+  <meta name="twitter:description" content="Les unes des grandes rédactions russes, réunies en une édition (russe/anglais)." />
+
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
+
+  <!-- Données structurées : NewsMediaOrganization + WebSite + ItemList de NewsArticle -->
+  <?php foreach ($jsonLd as $node): ?>
+  <script type="application/ld+json"><?php echo seo_json($node); ?></script>
+  <?php endforeach; ?>
 </head>
 <body data-i18n-title="title.home">
   <div class="paper-bg" aria-hidden="true"></div>
@@ -44,7 +72,7 @@
 
     <a class="mast" href="/">
       <span class="mast-ornament" aria-hidden="true">✦</span>
-      <h1 class="mast-title">ОКНО</h1>
+      <p class="mast-title">ОКНО</p>
       <p class="mast-line" data-i18n="mast.tagline">Обозрение · Москва, Петербург, мир</p>
       <span class="mast-ornament" aria-hidden="true">✦</span>
     </a>
@@ -66,7 +94,11 @@
   </div>
 
   <main class="edition" id="news-root" aria-live="polite">
-    <p id="news-status" class="news-status" data-i18n="news.composing">Собираем выпуск…</p>
+    <section class="sr-edition">
+      <h1 class="sr-edition-title">Главное — свежий выпуск: главные новости России и мира от семи редакций</h1>
+      <p id="news-status" class="news-status" data-i18n="news.composing">Собираем выпуск…</p>
+<?php echo $newsHtml; ?>
+    </section>
   </main>
 
   <footer class="media-footer" id="site-footer" lang="ru">
