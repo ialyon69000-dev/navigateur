@@ -1017,3 +1017,14 @@ tr:hover td { background: #f0eadc; }
   font-size: 0.9rem;
 }
 .summary-top li { margin-bottom: 0.15rem; }
+
+/* ——— Contenu pré-rendu pour les robots / LLM (remplacé par app.js en JS) ———
+   Visible uniquement si le JavaScript ne tourne pas : c'est le texte servi
+   aux moteurs de recherche et aux aspirateurs de grands modèles. */
+.sr-edition { max-width: 1080px; margin: 1.2rem auto; padding: 0 1.2rem 2.5rem; }
+.sr-edition-title { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; margin: 0.5rem 0 1.2rem; }
+.sr-news { padding: 0.7rem 0; border-bottom: 1px solid rgba(176, 137, 62, 0.18); }
+.sr-news h2 { font-family: var(--serif); font-size: 1.08rem; font-weight: 600; margin: 0; line-height: 1.35; }
+.sr-news h2 a { color: inherit; text-decoration: none; }
+.sr-news h2 a:hover { color: var(--gold, #b0893e); }
+.sr-news .meta { font-family: var(--mono); font-size: 0.72rem; color: var(--mute); margin: 0.25rem 0 0; letter-spacing: 0.02em; }
