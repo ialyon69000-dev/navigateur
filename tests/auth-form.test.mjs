@@ -118,18 +118,33 @@ for (const source of ["public/auth/auth.js", "infinityfree/htdocs/auth/auth.js"]
     assert.equal(dom.errorText(), "auth.success");
   });
 
-  test(`[${source}] une erreur métier (401) n'est pas masquée par le repli .php`, async () => {
-    const fetcher = scriptedFetch([
-      { match: "/api/auth/challenge", response: { ok: true, salt: "sel-1" } },
-      { match: "/api/auth/login", status: 401, response: { ok: false, error: "Неверный логин или пароль." } },
-    ]);
-    const dom = loadAuth({ source, ids: LOGIN_IDS, fetch: fetcher.impl });
-    dom.elements.login.value = "okno";
-    dom.elements.password.value = "mauvais";
-    dom.submit();
-    await new Promise((r) => setTimeout(r, 20));
-    assert.equal(fetcher.calls.length, 2, "pas de second essai sur une vraie réponse JSON");
-    assert.equal(dom.errorText(), "Неверный логин или пароль.");
+  test(`[${source}] une erreur métier (401) est traduite selon la langue de la page`, async () => {
+    // Le serveur répond toujours en russe ; la page doit l'afficher dans la
+    // langue choisie (OKNO.t est fourni par i18n.js dans un vrai navigateur).
+    const L10N = {
+      "authapi.err.invalid": { ru: "Неверный логин или пароль.", en: "Incorrect login or password." },
+    };
+    let lang = "ru";
+
+    async function attempt() {
+      const fetcher = scriptedFetch([
+        { match: "/api/auth/challenge", response: { ok: true, salt: "sel-1" } },
+        { match: "/api/auth/login", status: 401, response: { ok: false, error: "Неверный логин или пароль." } },
+      ]);
+      const dom = loadAuth({ source, ids: LOGIN_IDS, fetch: fetcher.impl });
+      dom.window.OKNO = { t: (key) => (L10N[key] && L10N[key][lang]) || key };
+      dom.elements.login.value = "okno";
+      dom.elements.password.value = "mauvais";
+      dom.submit();
+      await new Promise((r) => setTimeout(r, 20));
+      assert.equal(fetcher.calls.length, 2, "pas de second essai sur une vraie réponse JSON");
+      assert.equal(dom.elements["auth-error"].classList.contains("ok"), false, "erreur = style rouge, pas vert");
+      return dom.errorText();
+    }
+
+    assert.equal(await attempt(), "Неверный логин или пароль.", "page en russe → message en russe");
+    lang = "en";
+    assert.equal(await attempt(), "Incorrect login or password.", "page en anglais → message traduit en anglais");
   });
 
   test(`[${source}] champs vides : message immédiat, aucune requête`, async () => {

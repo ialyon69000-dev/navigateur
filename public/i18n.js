@@ -393,6 +393,18 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "register.success": { ru: "Аккаунт создан. Теперь войдите.", en: "Account created. Please sign in now." },
     "register.or": { ru: " · ", en: " · " },
 
+    // Messages d'erreur renvoyés par l'API d'authentification. Le serveur
+    // répond toujours en russe (server.js et api/auth/*.php) : ces clés
+    // permettent de les afficher dans la langue choisie sur la page.
+    "authapi.err.invalid": { ru: "Неверный логин или пароль.", en: "Incorrect login or password." },
+    "authapi.err.missing-fields": { ru: "Заполните логин и пароль.", en: "Fill in the login and password." },
+    "authapi.err.register-missing": { ru: "Укажите логин и пароль.", en: "Enter a login and password." },
+    "authapi.err.bad-format-login": { ru: "Неверный формат данных входа. Обновите страницу (Ctrl+F5).", en: "Invalid sign-in data. Refresh the page (Ctrl+F5)." },
+    "authapi.err.bad-format-register": { ru: "Неверный формат данных регистрации. Обновите страницу (Ctrl+F5).", en: "Invalid registration data. Refresh the page (Ctrl+F5)." },
+    "authapi.err.bad-salt": { ru: "Неверный формат соли.", en: "Invalid salt format." },
+    "authapi.err.login-length": { ru: "Логин от 3 до 40 знаков.", en: "Login must be 3 to 40 characters." },
+    "authapi.err.taken": { ru: "Этот логин уже занят.", en: "This login is already taken." },
+
     // dashboard
     "dash.title": { ru: "Личный кабинет", en: "Dashboard" },
     "dash.user": { ru: "Пользователь:", en: "User:" },
