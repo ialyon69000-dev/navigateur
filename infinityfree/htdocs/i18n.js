@@ -258,8 +258,8 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
       en: "Precise GPS position is not requested (that would trigger a popup). Reserved for an internal workshop, not covert third-party data collection.",
     },
     "privacy.links": {
-      ru: '<a href="/">Назад</a> · <a href="/laboratoire.html">Лаборатория</a> · <a href="/contacts.html">Контакты</a> · <a href="/informations-juridiques.html">Правовая информация</a>',
-      en: '<a href="/">Back</a> · <a href="/laboratoire.html">Laboratory</a> · <a href="/contacts.html">Contacts</a> · <a href="/informations-juridiques.html">Legal information</a>',
+      ru: '<a href="/">Назад</a> · <a href="/laboratoire.html">Лаборатория</a> · <a href="/contacts.html">Контакты</a> · <a href="/Legal-information.html">Правовая информация</a>',
+      en: '<a href="/">Back</a> · <a href="/laboratoire.html">Laboratory</a> · <a href="/contacts.html">Contacts</a> · <a href="/Legal-information.html">Legal information</a>',
     },
 
     "contacts.kicker": { ru: "Редакция", en: "Editorial office" },
@@ -296,8 +296,8 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
       en: "The editorial team reads every message and tries to reply within a few days. Please state the subject of your message briefly.",
     },
     "contacts.links": {
-      ru: '<a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/informations-juridiques.html">Правовая информация</a>',
-      en: '<a href="/">Journal</a> · <a href="/confidentialite.html">Privacy</a> · <a href="/informations-juridiques.html">Legal information</a>',
+      ru: '<a href="/">Журнал</a> · <a href="/confidentiality.html">Конфиденциальность</a> · <a href="/Legal-information.html">Правовая информация</a>',
+      en: '<a href="/">Journal</a> · <a href="/confidentiality.html">Privacy</a> · <a href="/Legal-information.html">Legal information</a>',
     },
 
     "legal.kicker": { ru: "О редакции", en: "About us" },
@@ -331,8 +331,8 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     },
     "legal.pd-title": { ru: "Персональные данные", en: "Personal data" },
     "legal.pd-text": {
-      ru: "Технические сведения о посетителях записываются в учебный журнал <code>data/visits.json</code> в рамках образовательной демонстрации. Порядок обработки этих сведений описан в <a href=\"/confidentialite.html\">политике конфиденциальности</a>.",
-      en: "Technical information about visitors is recorded in the educational journal <code>data/visits.json</code> as part of an educational demonstration. How this information is handled is described in the <a href=\"/confidentialite.html\">privacy policy</a>.",
+      ru: "Технические сведения о посетителях записываются в учебный журнал <code>data/visits.json</code> в рамках образовательной демонстрации. Порядок обработки этих сведений описан в <a href=\"/confidentiality.html\">политике конфиденциальности</a>.",
+      en: "Technical information about visitors is recorded in the educational journal <code>data/visits.json</code> as part of an educational demonstration. How this information is handled is described in the <a href=\"/confidentiality.html\">privacy policy</a>.",
     },
     "legal.contact-title": { ru: "Связь с редакцией", en: "Contacting the editorial office" },
     "legal.contact-text": {
@@ -340,8 +340,8 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
       en: "For all legal matters, write to <a href=\"mailto:artyomvolkov86@outlook.com\">artyomvolkov86@outlook.com</a> — ОКНО's only contact.",
     },
     "legal.links": {
-      ru: '<a href="/">Журнал</a> · <a href="/confidentialite.html">Конфиденциальность</a> · <a href="/contacts.html">Контакты</a>',
-      en: '<a href="/">Journal</a> · <a href="/confidentialite.html">Privacy</a> · <a href="/contacts.html">Contacts</a>',
+      ru: '<a href="/">Журнал</a> · <a href="/confidentiality.html">Конфиденциальность</a> · <a href="/contacts.html">Контакты</a>',
+      en: '<a href="/">Journal</a> · <a href="/confidentiality.html">Privacy</a> · <a href="/contacts.html">Contacts</a>',
     },
 
     "lang.switch-ru": { ru: "Русский", en: "Russian" },

@@ -1,6 +1,11 @@
 # InfinityFree - Rewrite API to PHP files + Security headers
 RewriteEngine On
 
+# Legacy URLs -> new canonical pages (renamed for clarity)
+RewriteRule ^confidentialite\.html$ /confidentiality.html [R=301,L]
+RewriteRule ^informations-juridiques\.html$ /Legal-information.html [R=301,L]
+
+
 # Page d'accueil : la version PHP (pré-rendu pour les robots / LLM) prime
 DirectoryIndex index.php index.html
 

@@ -140,7 +140,7 @@ function seo_home_jsonld(array $items, $max = 30)
         'url' => $base . '/',
         'description' => 'Les unes des grandes rédactions russes, réunies en une édition. Учебное сетевое издание (projet pédagogique).',
         'inLanguage' => ['ru', 'en', 'fr'],
-        'publishingPrinciples' => $base . '/informations-juridiques.html',
+        'publishingPrinciples' => $base . '/Legal-information.html',
     ];
 
     $graph[] = [
