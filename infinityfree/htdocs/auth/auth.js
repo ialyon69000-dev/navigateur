@@ -17,6 +17,32 @@
   const $ = (id) => document.getElementById(id);
   const T = (key, ...args) => (window.OKNO && window.OKNO.t ? window.OKNO.t(key, ...args) : key);
 
+  /*
+   * L'API d'authentification renvoie ses messages d'erreur en russe
+   * (« Неверный логин или пароль. »), quelle que soit la langue affichée sur
+   * la page. On les traduit donc côté client pour rester cohérent avec le
+   * sélecteur RU/EN. Si un message inconnu arrive (version serveur plus récente
+   * ou fautive), on le laisse tel quel plutôt que de casser l'affichage.
+   */
+  const SERVER_ERROR_KEYS = {
+    "неверный логин или пароль.": "authapi.err.invalid",
+    "заполните логин и пароль.": "authapi.err.missing-fields",
+    "укажите логин и пароль.": "authapi.err.register-missing",
+    "неверный формат данных входа. обновите страницу (ctrl+f5).": "authapi.err.bad-format-login",
+    "неверный формат данных регистрации. обновите страницу (ctrl+f5).": "authapi.err.bad-format-register",
+    "неверный формат соли.": "authapi.err.bad-salt",
+    "логин от 3 до 40 знаков.": "authapi.err.login-length",
+    "этот логин уже занят.": "authapi.err.taken",
+  };
+
+  function localizeServerError(msg) {
+    if (msg == null) return "";
+    const text = String(msg).trim();
+    if (!text) return text;
+    const key = SERVER_ERROR_KEYS[text.toLowerCase()];
+    return key ? T(key) : text;
+  }
+
   const FORM_ID = "auth-form";
   const ERROR_ID = "auth-error";
   const SUBMIT_ID = "auth-submit";
@@ -174,11 +200,12 @@
    * Interface
    * ------------------------------------------------------------------ */
 
-  function errorBox(show, text) {
+  function errorBox(show, text, kind) {
     const el = $(ERROR_ID);
     if (!el) return;
     el.textContent = text || "";
     el.classList.toggle("show", !!show);
+    el.classList.toggle("ok", !!show && kind === "ok");
   }
 
   function setSubmitLoading(loading) {
@@ -239,7 +266,7 @@
     }
     if (!res.ok || data.ok !== true) {
       lastFailure = "error";
-      lastFailureMessage = data.error ? String(data.error) : T("auth.server-error");
+      lastFailureMessage = data.error ? localizeServerError(data.error) : T("auth.server-error");
       if (!quiet) errorBox(true, lastFailureMessage);
       return null;
     }
@@ -314,7 +341,7 @@
       const hash = await hashPassword(form.password, chal.salt);
       const data = await api(URLS.login, { login: form.login, hash: hash });
       if (!data) return;
-      errorBox(true, T("auth.success"));
+      errorBox(true, T("auth.success"), "ok");
       setTimeout(() => {
         window.location.href = DASHBOARD_URL;
       }, 700);
@@ -350,7 +377,7 @@
       if (!data) return;
       if (data.user) {
         fillForm(data.user.login, "");
-        errorBox(true, T("register.success"));
+        errorBox(true, T("register.success"), "ok");
       }
     } finally {
       setSubmitLoading(false);

@@ -71,18 +71,28 @@
       letter-spacing: 0.02em;
     }
     .auth-error {
-      border-left: 3px solid var(--crimson);
-      background: rgba(158,27,27,0.05);
-      color: var(--crimson-deep);
-      font-family: var(--mono);
-      font-size: 0.74rem;
-      padding: 0.6rem 0.9rem;
-      margin-bottom: 1rem;
       display: none;
-      line-height: 1.4;
+      border: 1px solid rgba(158, 27, 27, 0.55);
+      border-left: 5px solid var(--crimson);
+      background: #fdecea;
+      color: var(--crimson-deep);
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.1rem;
+      line-height: 1.5;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
     .auth-error.show {
       display: block;
+    }
+    .auth-error.ok {
+      border-color: rgba(23, 121, 63, 0.55);
+      border-left-color: #17793f;
+      background: #e9f6ec;
+      color: #0f5c31;
     }
     .auth-submit {
       appearance: none;
@@ -230,7 +240,7 @@
   </footer>
 
   <script src="/i18n.js"></script>
-  <script src="/auth/auth.js?v=2"></script>
+  <script src="/auth/auth.js?v=3"></script>
   <script>
     (function () {
       document.getElementById("auth-time").textContent =
