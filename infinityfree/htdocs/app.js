@@ -35,12 +35,20 @@
     if (todayEl) {
       todayEl.textContent = formatStamp(now, true);
     }
+    // « Dernière mise à jour » : le temps écoulé depuis la dernière mise à
+    // jour du contenu (dépêche la plus récente). Recalculé à chaque seconde ;
+    // l'horodatage exact reste accessible au survol et dans datetime.
     const lastEl = $("last-update");
     if (lastEl) {
-      const stamp = state.lastUpdateAt ? new Date(state.lastUpdateAt) : now;
-      if (!Number.isNaN(stamp.getTime())) {
-        lastEl.dateTime = stamp.toISOString();
-        lastEl.textContent = formatStamp(stamp, true) + " (MSK)";
+      if (state.lastUpdateAt) {
+        const stamp = new Date(state.lastUpdateAt);
+        if (!Number.isNaN(stamp.getTime())) {
+          lastEl.dateTime = stamp.toISOString();
+          lastEl.textContent = timeAgo(stamp.toISOString());
+          lastEl.title = formatStamp(stamp, true) + " (MSK)";
+        }
+      } else {
+        lastEl.textContent = "—";
       }
     }
   }
@@ -354,9 +362,12 @@
     if (min < 60) return T("time.min", min);
     const h = Math.round(min / 60);
     if (h < 24) return T("time.h", h);
+    const days = Math.round(h / 24);
+    if (days < 7) return T("time.d", days);
     return new Intl.DateTimeFormat(dateLocale(), {
       day: "numeric",
       month: "short",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     }).format(d);
@@ -377,7 +388,9 @@
     return `<div class="${cls}" data-source="${escAttr(item.sourceId)}"><span class="thumb-ph">${letter}</span>${img}</div>`;
   }
 
-  // Compatibilité avec les dépêches historiques et les champs bilingues.
+  // Les dépêches peuvent être anciennes (chaînes simples) ou bilingues
+  // ({ru, en}). Toujours passer par loc() afin que le changement de langue
+  // s'applique aussi au contenu injecté après le chargement de la page.
   function loc(field) {
     return window.OKNO && typeof window.OKNO.loc === "function"
       ? window.OKNO.loc(field)
@@ -657,13 +670,25 @@
     root.appendChild(frag);
   }
 
+  // Un titre « cassé » (mauvais codage de caractères) : presque aucune lettre
+  // cyrillique mais beaucoup de « ? » / U+FFFD. On l'écarte pour ne jamais
+  // afficher de charabia du type « Ã© » / « Ð » ».
+  function isBrokenTitle(title) {
+    const s = String(title || "");
+    const cyr = (s.match(/[А-Яа-яЁё]/g) || []).length;
+    const junk = (s.match(/[?\uFFFD]/g) || []).length;
+    return cyr < 2 && junk >= 4;
+  }
+
   async function loadNews() {
     const status = $("news-status");
     try {
-      // Merge every reachable source so the feed never collapses to a few
-      // dispatches: the local InfinityFree endpoint (news.php, which embeds a
-      // 50+ snapshot) and the GitHub-main cache refreshed by Actions.
-      const cacheUrl = "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" + Math.floor(Date.now() / 300000);
+      // Fusionne toutes les sources joignables : l'API locale (/api/news) et
+      // le cache GitHub rafraîchi par Actions, pour ne jamais rester vide et
+      // pour écarter les éléments au codage cassé.
+      const cacheUrl =
+        "https://raw.githubusercontent.com/ialyon69000-dev/navigateur/main/infinityfree/htdocs/data/news_cache.json?t=" +
+        Math.floor(Date.now() / 300000);
       const probes = [
         fetch("/api/news").then((res) => {
           if (!res.ok) throw new Error("Local news cache unavailable");
@@ -677,12 +702,6 @@
       const results = await Promise.allSettled(probes);
       const seen = new Set();
       const merged = [];
-      const isBrokenTitle = (title) => {
-        const s = String(title || "");
-        const cyr = (s.match(/[А-Яа-яЁё]/g) || []).length;
-        const junk = (s.match(/[?\uFFFD]/g) || []).length;
-        return cyr < 2 && junk >= 4;
-      };
       for (const result of results) {
         if (result.status !== "fulfilled" || !result.value) continue;
         const items = Array.isArray(result.value.items) ? result.value.items : [];
@@ -695,6 +714,32 @@
       }
       merged.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
       if (!merged.length) throw new Error("No news source available");
+      // Dernière mise à jour du contenu affiché : la dépêche la plus récente
+      // retenue (le bandeau « Last update » affiche l'écart depuis cet
+      // instant). À défaut d'horodatage d'article, on prend l'instant où les
+      // sources ont été rafraîchies.
+      const publishedStamps = merged
+        .map((it) => (it.publishedAt ? Date.parse(it.publishedAt) : NaN))
+        .filter((n) => Number.isFinite(n));
+      let lastStamp = publishedStamps.length
+        ? new Date(Math.max(...publishedStamps)).toISOString()
+        : null;
+      if (!lastStamp) {
+        const refreshStamps = [];
+        for (const r of results) {
+          if (r.status !== "fulfilled" || !r.value) continue;
+          const raw = r.value.updatedAt
+            ? Date.parse(r.value.updatedAt)
+            : r.value.at != null
+              ? Number(r.value.at)
+              : NaN;
+          if (Number.isFinite(raw)) refreshStamps.push(raw);
+        }
+        if (refreshStamps.length) {
+          lastStamp = new Date(Math.max(...refreshStamps)).toISOString();
+        }
+      }
+      state.lastUpdateAt = lastStamp;
       state.news = merged;
       renderNews(merged);
     } catch (err) {
