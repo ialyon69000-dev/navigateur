@@ -371,6 +371,7 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "auth.submit": { ru: "Войти", en: "Sign in" },
     "auth.or": { ru: " · ", en: " · " },
     "auth.back-home": { ru: "На главную", en: "Back to home" },
+    "auth.no-account": { ru: "Нет аккаунта?", en: "Don’t have an account?" },
     "auth.register-link": { ru: "Создать логин", en: "Create an account" },
     "auth.login-link": { ru: "Войти", en: "Sign in" },
     "auth.empty-fields": { ru: "Заполните логин и пароль.", en: "Fill in the login and password." },

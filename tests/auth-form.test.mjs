@@ -157,6 +157,18 @@ for (const source of ["public/auth/auth.js", "infinityfree/htdocs/auth/auth.js"]
   });
 }
 
+test("l’invite d’inscription de la page de connexion est traduisible", async () => {
+  const fs = await import("node:fs");
+  for (const f of ["public/auth/login.html", "infinityfree/htdocs/auth/login.html"]) {
+    const html = fs.readFileSync(new URL("../" + f, import.meta.url), "utf8");
+    assert.match(html, /data-i18n="auth\.no-account">Нет аккаунта\?<\/span>/, f);
+  }
+  for (const f of ["public/i18n.js", "infinityfree/htdocs/i18n.js"]) {
+    const i18n = fs.readFileSync(new URL("../" + f, import.meta.url), "utf8");
+    assert.match(i18n, /"auth\.no-account": \{ ru: "Нет аккаунта\?", en: "Don’t have an account\?" \}/, f);
+  }
+});
+
 test("sans auth.js le formulaire refuse de partir (garde-fou HTML)", async () => {
   const fs = await import("node:fs");
   for (const f of [
