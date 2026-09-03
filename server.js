@@ -225,6 +225,21 @@ app.get(["/dashboard.html", "/dashboard"], (req, res) => {
   res.send(fs.readFileSync(path.join(__dirname, "public", "dashboard.html"), "utf8"));
 });
 
+// Legacy URLs -> new canonical pages (renamed)
+app.use((req, res, next) => {
+  const pathLower = String(req.path || "").toLowerCase();
+  if (pathLower === "/confidentialite.html" || pathLower === "/confidentialite") {
+    return res.redirect(301, "/confidentiality.html");
+  }
+  if (pathLower === "/informations-juridiques.html" || pathLower === "/informations-juridiques") {
+    return res.redirect(301, "/Legal-information.html");
+  }
+  if (pathLower === "/legal-information.html" && req.path !== "/Legal-information.html") {
+    return res.redirect(301, "/Legal-information.html");
+  }
+  next();
+});
+
 app.use(
   express.static(path.join(__dirname, "public"), {
     extensions: ["html"],

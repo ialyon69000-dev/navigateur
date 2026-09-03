@@ -168,7 +168,7 @@ test("bande : la rédaction garde la main sur les flux et leurs sources", async 
   });
   assert.equal(add.status, 200, add.text);
   const saved = readDispatches();
-  const fresh = saved.find((d) => d.title === "Dépesche du jour");
+  const fresh = saved.find((d) => (d.title?.ru ?? d.title) === "Dépesche du jour");
   assert.equal(fresh.source, "TASS", "la source est enregistrée");
   assert.equal(fresh.sourceId, "tass", "identifiant de source dérivé, minuscule");
   assert.equal(fresh.link, null, "un lien javascript: est rejeté");
@@ -179,7 +179,7 @@ test("bande : la rédaction garde la main sur les flux et leurs sources", async 
   const edit = await req("/api/dispatches", { method: "POST", cookie: admin, body: { id: fresh.id, title: "Titre corrigé" } });
   assert.equal(edit.status, 200, edit.text);
   const edited = readDispatches().find((d) => d.id === fresh.id);
-  assert.equal(edited.title, "Titre corrigé");
+  assert.equal(edited.title?.ru ?? edited.title, "Titre corrigé");
   assert.equal(edited.source, "TASS", "la source survit à l'édition");
 
   const del = await req(`/api/dispatches?id=${fresh.id}`, { method: "DELETE", cookie: admin, body: {} });

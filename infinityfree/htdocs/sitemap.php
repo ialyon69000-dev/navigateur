@@ -15,8 +15,8 @@ $homeLast = $newsMtime ? gmdate('c', $newsMtime) : gmdate('c', filemtime(__FILE_
 $pages = [
     ['path' => '/', 'priority' => '1.0', 'changefreq' => 'hourly', 'lastmod' => $homeLast],
     ['path' => '/laboratoire.html', 'priority' => '0.5', 'changefreq' => 'daily'],
-    ['path' => '/confidentialite.html', 'priority' => '0.3', 'changefreq' => 'monthly'],
-    ['path' => '/informations-juridiques.html', 'priority' => '0.3', 'changefreq' => 'monthly'],
+    ['path' => '/confidentiality.html', 'priority' => '0.3', 'changefreq' => 'monthly'],
+    ['path' => '/Legal-information.html', 'priority' => '0.3', 'changefreq' => 'monthly'],
     ['path' => '/contacts.html', 'priority' => '0.3', 'changefreq' => 'monthly'],
 ];
 

@@ -475,9 +475,7 @@
     const status = $("news-status");
     const root = $("news-root");
 
-    if ($("source-count")) {
-      $("source-count").textContent = T("rail.articles", items.length);
-    }
+    // article count removed from header-rail (per design)
     const ticker = $("ticker");
     if (ticker) {
       const heads = items.slice(0, 18).map((it) => `${it.source} — ${it.title}`).join("    ·    ");

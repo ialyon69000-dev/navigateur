@@ -51,10 +51,6 @@ $jsonLd = seo_home_jsonld($newsItems, 30);
   <header class="site-header">
     <div class="header-rail">
       <span id="today"></span>
-      <span class="rail-dot"></span>
-      <span id="source-count" data-i18n="rail.seven">Семь редакций</span>
-      <span class="rail-dot"></span>
-      <span data-i18n="rail.edition">Вечерний выпуск</span>
     </div>
 
     <div class="header-meta">
@@ -137,7 +133,7 @@ $jsonLd = seo_home_jsonld($newsItems, 30);
           </div>
           <div class="footer-column">
             <h2 data-i18n="footer.about">О редакции</h2>
-            <a href="/confidentialite.html" data-i18n="footer.privacy">Конфиденциальность</a>
+            <a href="/confidentiality.html" data-i18n="footer.privacy">Конфиденциальность</a>
             <a href="/contacts.html" data-i18n="footer.contacts">Контакты</a>
             <span data-i18n="footer.ad">Реклама</span>
             <a href="/contacts.html" data-i18n="footer.feedback">Обратная связь</a>
@@ -145,35 +141,18 @@ $jsonLd = seo_home_jsonld($newsItems, 30);
         </nav>
       </div>
 
-      <section class="visitor-meta" aria-labelledby="visitor-meta-title">
-        <div class="visitor-meta-heading">
-          <p class="footer-kicker" data-i18n="visitor.kicker">Данные соединения</p>
-          <h2 id="visitor-meta-title" data-i18n="visitor.title">Информация о посетителе</h2>
-          <p data-i18n="visitor.desc">Технические сведения, автоматически переданные вашим браузером.</p>
-        </div>
-        <dl class="captured" id="captured">
-          <div class="visitor-card">
-            <dt data-i18n="visitor.ip">IP-адрес посетителя</dt>
-            <dd id="c-ip">…</dd>
-          </div>
-          <div class="visitor-card">
-            <dt data-i18n="visitor.device">Тип устройства посетителя</dt>
-            <dd id="c-device">…</dd>
-          </div>
-        </dl>
-        <p class="record-status" id="record-status" hidden></p>
-      </section>
+
 
       <div class="footer-legal">
         <div>
-          <p>© 2026 «ОКНО». Все права защищены.</p>
-          <p>Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
+          <p data-i18n="legal.copy">© 2026 «ОКНО». Все права защищены.</p>
+          <p data-i18n="legal.disclaimer">Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
         </div>
         <div class="footer-legal-links">
-          <a href="/confidentialite.html">Политика конфиденциальности</a>
-          <a href="/informations-juridiques.html">Правовая информация</a>
+          <a href="/confidentiality.html" data-i18n="legal.privacy-policy">Политика конфиденциальности</a>
+          <a href="/Legal-information.html" data-i18n="legal.legal-info">Правовая информация</a>
         </div>
-        <strong class="age-mark" aria-label="Для лиц старше восемнадцати лет">18+</strong>
+        <strong class="age-mark" data-i18n="legal.18" data-i18n-attr="aria-label" data-i18n-attr-key="legal.18" aria-label="Для лиц старше восемнадцати лет">18+</strong>
       </div>
     </div>
   </footer>
