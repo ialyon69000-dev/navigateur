@@ -140,6 +140,16 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "time.now": { ru: "только что", en: "just now" },
     "time.min": { ru: (n) => `${n} мин назад`, en: (n) => `${n} min ago` },
     "time.h": { ru: (n) => `${n} ч назад`, en: (n) => `${n} h ago` },
+    "time.d": {
+      ru: (n) => {
+        const m10 = n % 10;
+        const m100 = n % 100;
+        if (m10 === 1 && m100 !== 11) return `${n} день назад`;
+        if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return `${n} дня назад`;
+        return `${n} дней назад`;
+      },
+      en: (n) => `${n} day${n === 1 ? "" : "s"} ago`,
+    },
 
     // topbar & lab
     "topbar.back": { ru: "Вернуться к журналу", en: "Back to the journal" },

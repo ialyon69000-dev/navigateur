@@ -35,12 +35,20 @@
     if (todayEl) {
       todayEl.textContent = formatStamp(now, true);
     }
+    // « Dernière mise à jour » : le temps écoulé depuis la dernière mise à
+    // jour du contenu (dépêche la plus récente). Recalculé à chaque seconde ;
+    // l'horodatage exact reste accessible au survol et dans datetime.
     const lastEl = $("last-update");
     if (lastEl) {
-      const stamp = state.lastUpdateAt ? new Date(state.lastUpdateAt) : now;
-      if (!Number.isNaN(stamp.getTime())) {
-        lastEl.dateTime = stamp.toISOString();
-        lastEl.textContent = formatStamp(stamp, true) + " (MSK)";
+      if (state.lastUpdateAt) {
+        const stamp = new Date(state.lastUpdateAt);
+        if (!Number.isNaN(stamp.getTime())) {
+          lastEl.dateTime = stamp.toISOString();
+          lastEl.textContent = timeAgo(stamp.toISOString());
+          lastEl.title = formatStamp(stamp, true) + " (MSK)";
+        }
+      } else {
+        lastEl.textContent = "—";
       }
     }
   }
@@ -354,9 +362,12 @@
     if (min < 60) return T("time.min", min);
     const h = Math.round(min / 60);
     if (h < 24) return T("time.h", h);
+    const days = Math.round(h / 24);
+    if (days < 7) return T("time.d", days);
     return new Intl.DateTimeFormat(dateLocale(), {
       day: "numeric",
       month: "short",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     }).format(d);
@@ -703,6 +714,32 @@
       }
       merged.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
       if (!merged.length) throw new Error("No news source available");
+      // Dernière mise à jour du contenu affiché : la dépêche la plus récente
+      // retenue (le bandeau « Last update » affiche l'écart depuis cet
+      // instant). À défaut d'horodatage d'article, on prend l'instant où les
+      // sources ont été rafraîchies.
+      const publishedStamps = merged
+        .map((it) => (it.publishedAt ? Date.parse(it.publishedAt) : NaN))
+        .filter((n) => Number.isFinite(n));
+      let lastStamp = publishedStamps.length
+        ? new Date(Math.max(...publishedStamps)).toISOString()
+        : null;
+      if (!lastStamp) {
+        const refreshStamps = [];
+        for (const r of results) {
+          if (r.status !== "fulfilled" || !r.value) continue;
+          const raw = r.value.updatedAt
+            ? Date.parse(r.value.updatedAt)
+            : r.value.at != null
+              ? Number(r.value.at)
+              : NaN;
+          if (Number.isFinite(raw)) refreshStamps.push(raw);
+        }
+        if (refreshStamps.length) {
+          lastStamp = new Date(Math.max(...refreshStamps)).toISOString();
+        }
+      }
+      state.lastUpdateAt = lastStamp;
       state.news = merged;
       renderNews(merged);
     } catch (err) {
