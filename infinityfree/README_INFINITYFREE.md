@@ -33,6 +33,9 @@ api/
                        POST /api/dispatches, DELETE ?id= — rédaction seulement
   messages.php         GET  /api/messages   — messages vus dans dashboard.html
                        (?all=1 : brouillons, admin seul) ; POST / DELETE : admin
+  comments.php         GET  /api/comments   — commentaires sous les messages ;
+                       POST  : tout utilisateur connecté (lecteur ou éditeur) ;
+                       DELETE ?id= : l'auteur, ou la rédaction (modération)
   _content.php         fonctions communes : sanitisation + contrôle des droits
   auth/
     _auth.php          logique commune (cookie okno-session, sha256+sel, sessions)
@@ -47,6 +50,7 @@ data/
   visits.json          journal des visites
   dispatches.json      dépêches de la bande (sources : visibles par la rédaction)
   messages.json        messages affichés par la rédaction dans le tableau de bord
+  comments.json        commentaires des lecteurs et de la rédaction (messages)
   news_cache.json      dernier instantané propre des flux (UTF-8)
   .htaccess            interdit l'accès direct au dossier
 ```

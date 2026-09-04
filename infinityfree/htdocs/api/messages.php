@@ -94,7 +94,12 @@ if ($method === 'DELETE') {
     if (count($kept) === count($items)) {
         auth_json(['ok' => false, 'code' => 'not-found', 'error' => 'Сообщение не найдено.'], 404);
     }
+    // Retirer un message emporte ses commentaires : ils vivent avec lui.
+    $keptComments = array_values(array_filter(content_read($GLOBALS['COMMENTS_FILE']), function ($c) use ($id) {
+        return is_array($c) && (!isset($c['messageId']) || $c['messageId'] !== $id);
+    }));
     if (!content_write($GLOBALS['MESSAGES_FILE'], $kept)) content_write_error();
+    if (!content_write($GLOBALS['COMMENTS_FILE'], $keptComments)) content_write_error();
     auth_json(['ok' => true, 'removed' => $id, 'updatedAt' => gmdate('c'), 'items' => $kept]);
 }
 

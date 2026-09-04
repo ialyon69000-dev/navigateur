@@ -46,6 +46,18 @@ const DISPATCHES = {
   ],
 };
 
+// Commentaires : l'un du lecteur connecté (« jean » dans ce test), un de la
+// rédaction, et un sur le brouillon — qui ne doit pas sortir vers un lecteur.
+const COMMENTS = {
+  ok: true,
+  updatedAt: "2026-08-28T10:05:00Z",
+  items: [
+    { id: "c_1", messageId: "m_1", author: "jean", body: "C'est mieux en clair.", createdAt: "2026-08-28T08:30:00Z", updatedAt: "2026-08-28T08:30:00Z" },
+    { id: "c_2", messageId: "m_1", author: "okno", body: "Merci de votre lecture.", createdAt: "2026-08-28T09:00:00Z", updatedAt: "2026-08-28T09:00:00Z" },
+    { id: "c_3", messageId: "m_2", author: "okno", body: "Interne au brouillon.", createdAt: "2026-08-28T09:30:00Z", updatedAt: "2026-08-28T09:30:00Z" },
+  ],
+};
+
 const ADMIN_IDS = {
   "sec-msg-admin": ["admin-only"],
   "sec-flux": ["admin-only"],
@@ -62,6 +74,7 @@ for (const prefix of ["public", "infinityfree/htdocs"]) {
       routes: {
         "/api/auth/me": { ok: true, user: { id: "u_1", login: "jean", role: "reader", createdAt: "2026-08-20T00:00:00Z" } },
         "/api/messages": MESSAGES,
+        "/api/comments": COMMENTS,
         "/api/dispatches": DISPATCHES,
       },
     });
@@ -87,11 +100,26 @@ for (const prefix of ["public", "infinityfree/htdocs"]) {
     assert.doesNotMatch(page.el("msg-list").innerHTML, /Черновик выпуска/, "un brouillon n'est pas affiché");
     assert.equal(page.el("stat-messages").textContent, "1", "seul le message publié est compté");
 
+    // commentaires : le lecteur les voit sous le message, et peut écrire
+    assert.equal(page.calls.some((c) => c.pathname === "/api/comments"), true, "/api/comments est chargé");
+    const cards = page.el("msg-list").innerHTML;
+    assert.match(cards, /Комментарии: 2/, "le compteur du message publié");
+    assert.match(cards, /C'est mieux en clair\./, "le commentaire du lecteur est affiché");
+    assert.match(cards, /Merci de votre lecture\./, "le commentaire de la rédaction est affiché");
+    assert.doesNotMatch(cards, /Interne au brouillon\./, "le commentaire du brouillon ne sort pas");
+    assert.doesNotMatch(cards, /data-msgid="m_2"/, "pas de bloc de commentaires pour un brouillon invisible");
+    assert.match(cards, /class="comment-form" data-msgid="m_1"/, "un formulaire de commentaire sous le message");
+    // chacun ne peut retirer que SON commentaire : jean ne supprime que c_1
+    const delButtons = (cards.match(/data-act="comment-del"/g) || []).length;
+    assert.equal(delButtons, 1, "un seul bouton de suppression pour le lecteur : son propre commentaire");
+
     // ——— changer de langue retraduit le rôle et les messages ———
     page.setLang("en");
     await page.settle(2);
     assert.equal(page.el("stat-role").textContent, "Reader", "le rôle suit la langue");
     assert.match(page.el("msg-list").innerHTML, /Newsroom call at 18:00/, "le message suit la langue");
+    assert.match(page.el("msg-list").innerHTML, /Comments: 2/, "le compteur de commentaires suit la langue");
+    assert.match(page.el("msg-list").innerHTML, /Your comment…/, "le formulaire de commentaire suit la langue");
     assert.doesNotMatch(page.el("msg-list").innerHTML, /Планёрка/);
   });
 
@@ -111,6 +139,7 @@ for (const prefix of ["public", "infinityfree/htdocs"]) {
           }
           return MESSAGES;
         },
+        "/api/comments": COMMENTS,
         "/api/dispatches": DISPATCHES,
       },
     });
@@ -128,6 +157,14 @@ for (const prefix of ["public", "infinityfree/htdocs"]) {
     assert.match(page.el("disp-body").innerHTML, /data-act="delete"/, "chaque ligne est éditable");
     assert.match(page.calls.find((c) => c.url.startsWith("/api/messages")).url, /all=1/, "l'admin réclame les brouillons");
     assert.match(page.el("msg-admin-list").innerHTML, /Черновик выпуска/, "la liste d'admin montre le brouillon");
+
+    // commentaires : la rédaction voit aussi ceux des brouillons et modère tout
+    const cards = page.el("msg-list").innerHTML;
+    assert.match(cards, /Комментарии: 2/, "compteur du message publié");
+    assert.match(cards, /data-msgid="m_2"/, "le brouillon a bien son bloc de commentaires");
+    assert.match(cards, /Interne au brouillon\./, "la rédaction voit le commentaire du brouillon");
+    const delButtons = (cards.match(/data-act="comment-del"/g) || []).length;
+    assert.equal(delButtons, 3, "la rédaction peut retirer n'importe quel commentaire");
 
     // ——— enregistrer un message : bilingue, auteur = la session, jamais le client ———
     page.el("msg-title-ru").value = "Новое";

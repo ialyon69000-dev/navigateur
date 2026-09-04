@@ -231,6 +231,7 @@ if (runner.request) {
       ["api/visits.php", "GET", null],
       ["api/dispatches.php", "GET", null],
       ["api/messages.php", "GET", null],
+      ["api/comments.php", "GET", null],
       ["api/visit.php", "POST", { language: "fr" }],
       ["api/auth/challenge.php", "GET", null],
       ["api/auth/me.php", "GET", null],
@@ -342,7 +343,8 @@ if (runner.request) {
     });
     assert.equal(fluxAdd.status, 200, fluxAdd.body);
     const flux = JSON.parse(await runner.read("data/dispatches.json"));
-    const added = flux.find((d) => d.title === "Депеша");
+    // Le titre est bilingue { ru, en } depuis que la bande a suivi les messages.
+    const added = flux.find((d) => (d.title && d.title.ru === "Депеша") || d.title === "Депеша");
     assert.ok(added && added.id.startsWith("d_"), "la dépêche est ajoutée");
     assert.equal(added.source, "TASS", "la source est conservée pour la rédaction");
     assert.equal(added.sourceId, "tass", "un identifiant de source est dérivé");
@@ -355,5 +357,118 @@ if (runner.request) {
     // ——— méthode refusée ———
     const patch = await runner.request("api/messages.php", { method: "PATCH", cookie: adminCookie, body: "{}" });
     assert.equal(patch.status, 405, patch.body);
+  });
+}
+
+if (runner.request) {
+  test("commentaires : lecteur et éditeur connectés commentent, seuls les messages publiés", async () => {
+    const pwd = "Contenu!2026";
+    const mk = (id, login, role) => {
+      const salt = "salt-c-" + id;
+      const h1 = clientHash(pwd, salt);
+      return { id, login, hash: nodeSha(h1 + salt), salt, scheme: 2, createdAt: "2026-08-01T00:00:00Z", role, _h1: h1 };
+    };
+    const admin = mk("admin", "okno", "editor");
+    const lectrice = mk("u_read", "claire", "reader");
+    runner.write(
+      "data/users.json",
+      JSON.stringify(
+        [admin, lectrice].map(({ _h1, ...u }) => u),
+        null,
+        2,
+      ),
+    );
+    runner.write("data/messages.json", JSON.stringify([
+      { id: "m_1", title: { ru: "Опубликовано", en: "Published" }, body: { ru: "да", en: "yes" }, active: true, author: "okno", createdAt: "2026-08-20T00:00:00Z", updatedAt: "2026-08-20T00:00:00Z" },
+      { id: "m_2", title: { ru: "Черновик", en: "Draft" }, body: { ru: "нет", en: "no" }, active: false, author: "okno", createdAt: "2026-08-21T00:00:00Z", updatedAt: "2026-08-21T00:00:00Z" },
+    ], null, 2));
+    // un commentaire ancien sur le message publié, un sur le brouillon
+    runner.write("data/comments.json", JSON.stringify([
+      { id: "c_old", messageId: "m_1", author: "claire", body: "D'accord avec la rédaction.", createdAt: "2026-08-22T08:00:00Z", updatedAt: "2026-08-22T08:00:00Z" },
+      { id: "c_draft", messageId: "m_2", author: "okno", body: "Note interne au brouillon.", createdAt: "2026-08-22T09:00:00Z", updatedAt: "2026-08-22T09:00:00Z" },
+    ], null, 2));
+
+    const sidOf = async (login) => {
+      const r = await runner.request("api/auth/login.php", { method: "POST", body: { login, hash: login === "claire" ? lectrice._h1 : admin._h1 } });
+      assert.equal(r.status, 200, r.body);
+      return "okno-session=" + runner.cookieOf(r, "okno-session");
+    };
+    const adminCookie = await sidOf("okno");
+    const readerCookie = await sidOf("claire");
+
+    // ——— lecture : anonyme et lecteur ne voient que les commentaires des messages publiés ———
+    const anon = await runner.request("api/comments.php");
+    assert.equal(anon.status, 200, anon.body);
+    assert.deepEqual(JSON.parse(anon.body).items.map((c) => c.id), ["c_old"], "le commentaire du brouillon ne sort pas");
+
+    const readerView = await runner.request("api/comments.php", { cookie: readerCookie });
+    assert.deepEqual(JSON.parse(readerView.body).items.map((c) => c.id), ["c_old"], "le lecteur ne voit pas le commentaire du brouillon");
+
+    const adminView = await runner.request("api/comments.php", { cookie: adminCookie });
+    assert.deepEqual(JSON.parse(adminView.body).items.map((c) => c.id), ["c_old", "c_draft"], "la rédaction voit tout, du plus ancien au plus récent");
+
+    const filtered = await runner.request("api/comments.php", { query: { messageId: "m_2" }, cookie: adminCookie });
+    assert.deepEqual(JSON.parse(filtered.body).items.map((c) => c.id), ["c_draft"], "?messageId= filtre par message");
+
+    // ——— écrire : 401 sans session ; le lecteur peut commenter un message publié ———
+    const noSession = await runner.request("api/comments.php", { method: "POST", body: { messageId: "m_1", body: "x" } });
+    assert.equal(noSession.status, 401, noSession.body);
+    assert.equal(JSON.parse(noSession.body).code, "auth-required");
+
+    const byReader = await runner.request("api/comments.php", {
+      method: "POST",
+      cookie: readerCookie,
+      body: { messageId: "m_1", body: "C'est mieux en clair.", author: "pirate" },
+    });
+    assert.equal(byReader.status, 200, byReader.body);
+    const item = JSON.parse(byReader.body).item;
+    assert.ok(item && item.id.startsWith("c_"), "l'objet est écrit dans data/comments.json");
+    assert.equal(item.messageId, "m_1");
+    assert.equal(item.author, "claire", "l'auteur est le login de session, jamais celui du client");
+
+    const afterReader = JSON.parse(await runner.read("data/comments.json"));
+    const posted = afterReader.find((c) => c.id === item.id);
+    assert.ok(posted, "le commentaire est dans le fichier");
+    assert.equal(posted.body, "C'est mieux en clair.");
+    assert.equal(posted.author, "claire");
+
+    // ——— un brouillon reste hors de portée des lecteurs ———
+    const onDraft = await runner.request("api/comments.php", { method: "POST", cookie: readerCookie, body: { messageId: "m_2", body: "je ne devrais pas pouvoir" } });
+    assert.equal(onDraft.status, 404, onDraft.body);
+    assert.equal(JSON.parse(onDraft.body).code, "message-not-found");
+
+    // ——— la rédaction, elle, commente aussi ses brouillons ———
+    const byEditor = await runner.request("api/comments.php", { method: "POST", cookie: adminCookie, body: { messageId: "m_2", body: "Idée pour plus tard." } });
+    assert.equal(byEditor.status, 200, byEditor.body);
+    const editorItem = JSON.parse(byEditor.body).item;
+    assert.equal(editorItem.author, "okno");
+
+    // ——— validation : message inconnu et texte vide ———
+    const unknownMsg = await runner.request("api/comments.php", { method: "POST", cookie: readerCookie, body: { messageId: "m_zzz", body: "x" } });
+    assert.equal(unknownMsg.status, 404, unknownMsg.body);
+    const emptyBody = await runner.request("api/comments.php", { method: "POST", cookie: readerCookie, body: { messageId: "m_1", body: "   " } });
+    assert.equal(emptyBody.status, 400, emptyBody.body);
+    assert.equal(JSON.parse(emptyBody.body).code, "comment-required");
+
+    // ——— suppression : l'auteur retire le sien, pas celui des autres ———
+    const delOther = await runner.request("api/comments.php", { method: "DELETE", query: { id: editorItem.id }, cookie: readerCookie });
+    assert.equal(delOther.status, 403, delOther.body);
+    assert.equal(JSON.parse(delOther.body).code, "not-owner");
+
+    const delOwn = await runner.request("api/comments.php", { method: "DELETE", query: { id: item.id }, cookie: readerCookie });
+    assert.equal(delOwn.status, 200, delOwn.body);
+    assert.equal(JSON.parse(await runner.read("data/comments.json")).some((c) => c.id === item.id), false, "retiré du fichier");
+
+    // la rédaction modère : elle retire le commentaire de la lectrice restant
+    const delModerate = await runner.request("api/comments.php", { method: "DELETE", query: { id: "c_old" }, cookie: adminCookie });
+    assert.equal(delModerate.status, 200, delModerate.body);
+
+    const delUnknown = await runner.request("api/comments.php", { method: "DELETE", query: { id: "c_introuvable" }, cookie: readerCookie });
+    assert.equal(delUnknown.status, 404, delUnknown.body);
+
+    // ——— retirer un message emporte ses commentaires ———
+    const cascade = await runner.request("api/messages.php", { method: "DELETE", query: { id: "m_2" }, cookie: adminCookie });
+    assert.equal(cascade.status, 200, cascade.body);
+    assert.equal(JSON.parse(await runner.read("data/comments.json")).some((c) => c.messageId === "m_2"), false, "commentaires du message supprimé nettoyés");
   });
 }

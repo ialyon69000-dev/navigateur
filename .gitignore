@@ -7,3 +7,6 @@ infinityfree/htdocs/data/*.json
 # tableau de bord avec un message d'accueil de la rédaction.
 !data/messages.json
 !infinityfree/htdocs/data/messages.json
+# Stockage des commentaires : fichier vide au départ, comme messages.json.
+!data/comments.json
+!infinityfree/htdocs/data/comments.json

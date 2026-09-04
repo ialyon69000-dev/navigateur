@@ -1353,13 +1353,19 @@ app.post("/api/auth/logout", (req, res) => {
 //     rédaction. Les dépêches, leurs sources et leurs liens ne transitent
 //     jamais vers son tableau de bord (voir public/dashboard.js).
 //
+// Commenter (/api/comments), en revanche, est ouvert à tout utilisateur
+// connecté — lecteur comme éditeur. Écrire (messages ou bande) reste réservé
+// à la rédaction.
+//
 // Les libellés de rôle ne sont pas renvoyés par le serveur : le client traduit
 // « reader » / « editor » lui-même (window.OKNO.roleLabel).
 const DISPATCHES_FILE = path.join(DATA_DIR, "dispatches.json");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
+const COMMENTS_FILE = path.join(DATA_DIR, "comments.json");
 const ADMIN_ROLES = new Set(["editor", "admin"]);
 const MAX_MESSAGES = 80;
 const MAX_DISPATCHES = 200;
+const MAX_COMMENTS = 1000;
 
 function isAdminUser(user) {
   return !!user && ADMIN_ROLES.has(String(user.role || "reader").toLowerCase());
@@ -1389,6 +1395,10 @@ function readDispatches() {
 
 function readMessages() {
   return readJsonFile(MESSAGES_FILE);
+}
+
+function readComments() {
+  return readJsonFile(COMMENTS_FILE);
 }
 
 // ——— Sanitisation ———
@@ -1440,6 +1450,17 @@ function sanitizeMessage(input, existing) {
   };
 }
 
+/**
+ * Commentaire d'un lecteur ou de la rédaction sur un message. Le corps est un
+ * texte libre, pas bilingue : chacun écrit dans la langue qu'il veut.
+ */
+function sanitizeComment(input) {
+  return {
+    messageId: clampText(input && input.messageId, 40),
+    body: clampText(input && input.body, 600),
+  };
+}
+
 function sanitizeDispatch(input, existing) {
   const base = existing || {};
   const pick = (key, max) => clampText(input[key] !== undefined ? input[key] : base[key], max);
@@ -1480,9 +1501,21 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-function writeContent(res, file, list, payload) {
+/** Garde d'écriture : session valide, quel que soit le rôle (lecteur ou rédaction). */
+function requireUser(req, res, next) {
+  const user = sessionUser(req);
+  if (!user) {
+    res.status(401).json({ ok: false, code: "auth-required", error: "Войдите, чтобы комментировать." });
+    return;
+  }
+  req.oknoUser = user;
+  next();
+}
+
+function writeContent(res, file, list, payload, extra) {
   try {
     writeJsonFile(file, list);
+    if (extra && extra.file) writeJsonFile(extra.file, extra.list);
   } catch (err) {
     res.status(500).json({
       ok: false,
@@ -1547,7 +1580,93 @@ app.delete("/api/messages", requireAdmin, (req, res) => {
     res.status(404).json({ ok: false, code: "not-found", error: "Сообщение не найдено." });
     return;
   }
-  writeContent(res, MESSAGES_FILE, next, { removed: id, items: next });
+  // Retirer un message emporte ses commentaires : ils vivent avec lui.
+  const comments = readComments().filter((c) => c.messageId !== id);
+  writeContent(
+    res,
+    MESSAGES_FILE,
+    next,
+    { removed: id, items: next },
+    { file: COMMENTS_FILE, list: comments }
+  );
+});
+
+// ——— Commentaires des messages ———
+//
+// Écrire un message reste réservé à la rédaction (rôle « editor »), mais tout
+// utilisateur connecté — lecteur comme éditeur — peut commenter les messages.
+// Un commentaire n'est pas bilingue : son auteur écrit dans la langue qu'il
+// veut, et le texte passe tel quel (jamais de HTML).
+app.get("/api/comments", (req, res) => {
+  const user = sessionUser(req);
+  const admin = isAdminUser(user);
+  // Un commentaire vit avec son message : pour qui ne voit que les messages
+  // publiés, les commentaires des brouillons n'existent pas. La rédaction,
+  // elle, voit tout — brouillons et commentaires compris.
+  const visibleIds = new Set(
+    readMessages()
+      .filter((m) => admin || m.active !== false)
+      .map((m) => m.id)
+  );
+  const only = clampText(req.query.messageId, 40);
+  const items = readComments()
+    .filter((c) => c && visibleIds.has(c.messageId) && (!only || c.messageId === only))
+    .sort((a, b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
+  res.json({ ok: true, updatedAt: new Date().toISOString(), items });
+});
+
+app.post("/api/comments", requireUser, (req, res) => {
+  const body = req.body || {};
+  const user = req.oknoUser;
+  const msgId = clampText(body.messageId, 40);
+  const msg = readMessages().find((m) => m.id === msgId);
+  // Un lecteur ne commente que les messages publiés ; la rédaction peut aussi
+  // commenter ses brouillons (ils restent invisibles hors de la rédaction).
+  if (!msg || (!isAdminUser(user) && msg.active === false)) {
+    res.status(404).json({ ok: false, code: "message-not-found", error: "Сообщение не найдено." });
+    return;
+  }
+  const next = sanitizeComment(body);
+  if (!next.body) {
+    res.status(400).json({ ok: false, code: "comment-required", error: "Заполните текст комментария." });
+    return;
+  }
+  const now = new Date().toISOString();
+  const comment = Object.assign({}, next, {
+    id: newContentId("c"),
+    // L'auteur est un login de session, jamais une valeur du client.
+    author: user.login,
+    createdAt: now,
+    updatedAt: now,
+  });
+  let comments = readComments();
+  comments.push(comment);
+  if (comments.length > MAX_COMMENTS) comments = comments.slice(-MAX_COMMENTS);
+  writeContent(res, COMMENTS_FILE, comments, { item: comment });
+});
+
+app.delete("/api/comments", (req, res) => {
+  const user = sessionUser(req);
+  if (!user) {
+    res.status(401).json({ ok: false, code: "auth-required", error: "Войдите, чтобы удалять комментарии." });
+    return;
+  }
+  const id = clampText((req.body && req.body.id) || req.query.id, 40);
+  const items = readComments();
+  const idx = id ? items.findIndex((c) => c.id === id) : -1;
+  if (idx < 0) {
+    res.status(404).json({ ok: false, code: "not-found", error: "Комментарий не найден." });
+    return;
+  }
+  // Chacun retire son propre commentaire ; la rédaction modère l'ensemble.
+  const isAuthor = items[idx].author === user.login;
+  if (!isAuthor && !isAdminUser(user)) {
+    res.status(403).json({ ok: false, code: "not-owner", error: "Можно удалить только свой комментарий." });
+    return;
+  }
+  const next = items.slice();
+  next.splice(idx, 1);
+  writeContent(res, COMMENTS_FILE, next, { removed: id, items: next });
 });
 
 // ——— La bande (les flux préparés par la rédaction) ———
@@ -1595,6 +1714,7 @@ app.delete("/api/dispatches", requireAdmin, (req, res) => {
 function ensureContentFiles() {
   ensureDataFile();
   if (!fs.existsSync(DISPATCHES_FILE)) writeJsonFile(DISPATCHES_FILE, []);
+  if (!fs.existsSync(COMMENTS_FILE)) writeJsonFile(COMMENTS_FILE, []);
   if (!fs.existsSync(MESSAGES_FILE)) {
     writeJsonFile(MESSAGES_FILE, [
       {
