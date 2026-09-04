@@ -439,25 +439,36 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "role.admin": { ru: "Администратор", en: "Administrator" },
     "role.unknown": { ru: (r) => `Роль: ${r}`, en: (r) => `Role: ${r}` },
     "dash.rights-reader": {
-      ru: "Видит сообщения редакции, не видит источников ленты",
-      en: "Sees the newsroom's messages, never the feed sources",
+      ru: "Читает сообщения редакции (источников ленты не видит) и комментирует их",
+      en: "Reads the newsroom's messages (never the feed sources) and may comment on them",
     },
     "dash.rights-editor": {
-      ru: "Управляет лентой и сообщениями редакции",
-      en: "Manages the feed and the newsroom's messages",
+      ru: "Управляет лентой и сообщениями; комментирует, как читатель",
+      en: "Manages the feed and the messages; comments like a reader",
     },
 
     // ——— Messages de la rédaction : ce que l'utilisateur voit ———
     "dash.messages-title": { ru: "Сообщения редакции", en: "Newsroom messages" },
     "dash.messages-hint": {
-      ru: "Только тексты редакции: источники ленты здесь не показываются.",
-      en: "The newsroom's notes only: feed sources are never displayed here.",
+      ru: "Сообщения пишет только редакция; под каждым можно оставить комментарий. Источники ленты здесь не показываются.",
+      en: "Only the newsroom writes messages; anyone may comment under each one. Feed sources are never displayed here.",
     },
     "dash.messages-empty": { ru: "Пока нет сообщений от редакции.", en: "No newsroom message yet." },
     "dash.stat-messages": { ru: "Сообщения", en: "Messages" },
     "dash.stat-messages-note": { ru: "Опубликовано редакцией", en: "Published by the newsroom" },
     "dash.msg-by": { ru: (who) => `от ${who}`, en: (who) => `by ${who}` },
     "dash.msg-draft": { ru: "черновик", en: "draft" },
+
+    // ——— Commentaires sous les messages (lecteur et rédaction, connectés) ———
+    "dash.comments-count": { ru: (n) => `Комментарии: ${n}`, en: (n) => `Comments: ${n}` },
+    "dash.comments-empty": {
+      ru: "Пока нет комментариев. Будьте первым, кто напишет.",
+      en: "No comments yet. Be the first to write one.",
+    },
+    "dash.comment-placeholder": { ru: "Ваш комментарий…", en: "Your comment…" },
+    "dash.comment-send": { ru: "Отправить", en: "Send" },
+    "dash.comment-need-text": { ru: "Напишите текст комментария.", en: "Write the comment text first." },
+    "dash.comment-confirm": { ru: "Удалить этот комментарий?", en: "Delete this comment?" },
 
     // ——— Admin : gestion des messages ———
     "dash.msg-admin-title": { ru: "Публикация сообщений", en: "Publishing the messages" },

@@ -16,8 +16,10 @@ require_once __DIR__ . '/auth/_auth.php';
 $CONTENT_DATA_DIR = $AUTH_DATA_DIR;
 $MESSAGES_FILE = $CONTENT_DATA_DIR . '/messages.json';
 $DISPATCHES_FILE = $CONTENT_DATA_DIR . '/dispatches.json';
+$COMMENTS_FILE = $CONTENT_DATA_DIR . '/comments.json';
 $MAX_MESSAGES = 80;
 $MAX_DISPATCHES = 200;
+$MAX_COMMENTS = 1000;
 $ADMIN_ROLES = ['editor', 'admin'];
 
 /* ——— petits utilitaires d'écriture ——— */
@@ -115,6 +117,18 @@ function content_sanitize_message($in, $base) {
     ];
 }
 
+/**
+ * Commentaire d'un lecteur ou de la rédaction sur un message. Le corps est un
+ * texte libre, pas bilingue : chacun écrit dans la langue qu'il veut.
+ */
+function content_sanitize_comment($in) {
+    $in = is_array($in) ? $in : [];
+    return [
+        'messageId' => content_clamp($in['messageId'] ?? null, 40),
+        'body' => content_clamp($in['body'] ?? null, 600),
+    ];
+}
+
 function content_sanitize_dispatch($in, $base) {
     $base = is_array($base) ? $base : [];
     $pick = function ($key, $max) use ($in, $base) {
@@ -165,6 +179,19 @@ function content_require_admin() {
             'code' => 'admin-required',
             'error' => 'Только редакция может менять ленту и сообщения.',
         ], 403);
+    }
+    return $user;
+}
+
+/** Écrire un commentaire exige une session valide — lecteur comme rédaction. */
+function content_require_user() {
+    $user = auth_current_user();
+    if (!$user) {
+        auth_json([
+            'ok' => false,
+            'code' => 'auth-required',
+            'error' => 'Войдите, чтобы комментировать.',
+        ], 401);
     }
     return $user;
 }

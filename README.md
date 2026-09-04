@@ -36,20 +36,29 @@ Un lecteur ne reçoit donc jamais la source d'un flux : `dashboard.js` n'appelle
 `/api/dispatches` que si le rôle est administrateur, et le tableau reste vide
 dans la page servie.
 
-Écrire (messages ou bande) exige une session valide + un rôle administrateur :
+Écrire (messages ou bande) exige une session valide + un rôle administrateur.
+En revanche **commenter est ouvert à tout utilisateur connecté** — lecteur
+comme éditeur : chacun écrit sous les messages publiés par la rédaction, avec
+son login de session (jamais une valeur du client), et peut retirer son propre
+commentaire ; la rédaction modère l'ensemble.
 
 | Route | Effet | Droits |
 |-------|-------|--------|
 | `GET /api/messages` | messages publiés ; `?all=1` ajoute les brouillons (admin seulement) | public |
 | `POST /api/messages` | créer (sans `id`) ou mettre à jour (avec `id`) ; un envoi partiel ne vide pas les autres champs | admin |
-| `DELETE /api/messages?id=…` | retirer un message | admin |
+| `DELETE /api/messages?id=…` | retirer un message (ses commentaires sont emportés) | admin |
+| `GET /api/comments` | commentaires des messages visibles ; `?messageId=…` pour un seul ; la rédaction voit aussi ceux de ses brouillons | public |
+| `POST /api/comments` | commenter un message (`{ messageId, body }`, auteur = login de session) ; un lecteur ne commente que les messages publiés | session valide |
+| `DELETE /api/comments?id=…` | retirer son propre commentaire (la rédaction retire n'importe lequel) | auteur ou admin |
 | `GET /api/dispatches` | la bande, sources comprises | public |
 | `POST /api/dispatches` / `DELETE /api/dispatches?id=…` | ajouter / corriger / retirer une dépêche | admin |
 
 Un message est bilingue : `{ title: { ru, en }, body: { ru, en }, active }`.
 L'utilisateur lit la langue qu'il a choisie (repli sur le russe si la version
 manque). Les brouillons (`active: false`) ne quittent jamais le serveur.
-Stockage : `data/messages.json` et `data/dispatches.json` (mêmes fichiers côté PHP).
+Un commentaire, lui, est un texte libre dans la langue que son auteur veut
+(jusqu'à 600 caractères, jamais de HTML). Stockage : `data/messages.json`,
+`data/comments.json` et `data/dispatches.json` (mêmes fichiers côté PHP).
 
 ## Journal et synthèse : deux fichiers
 
@@ -190,9 +199,9 @@ référents) et un tableau des clients.
 ### 1. Version Node.js (originale) — `server.js` + `public/`
 - Express + rss-parser + iconv-lite
 - APIs : `/api/me`, `/api/news`, `/api/visit`, `/api/visits`, `/api/health`,
-  `/api/messages`, `/api/dispatches` (lecture + écriture admin)
+  `/api/messages`, `/api/comments` (lecture + écriture connectés), `/api/dispatches` (lecture + écriture admin)
 - Authentification : `/api/auth/login|register|me|logout`, tableau de bord `/dashboard.html`
-- Stockage `data/` (visits.json, visits_summary.json, users.json, sessions.json, dispatches.json, messages.json, news_cache.json)
+- Stockage `data/` (visits.json, visits_summary.json, users.json, sessions.json, dispatches.json, messages.json, comments.json, news_cache.json)
 - `render.yaml` prêt pour Render.com
 
 **Lancer :**
@@ -217,7 +226,7 @@ confidentialite/contacts/informations-juridiques/laboratoire.html
 auth/login.html, auth/register.html, auth/dispatches.html, dashboard.html
 vk.html + log.php                                   (exercice phishing)
 .htaccess                                           (réécritures /api/*)
-api/*.php + api/auth/*.php                          (backend, dont messages.php et _content.php)
+api/*.php + api/auth/*.php                          (backend, dont messages.php, comments.php et _content.php)
 data/*.json                                         (writable : 777 data/, 666 fichiers)
 ```
 

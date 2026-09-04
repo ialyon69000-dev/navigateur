@@ -136,10 +136,16 @@ export async function createPhpRunner() {
   const { pathToFileURL } = await import("node:url");
   const req = createRequire(/^(\/|\.\.?\/|file:)/.test(wasmSpecifier) ? wasmSpecifier : import.meta.url);
   const universalCjs = req.resolve("@php-wasm/universal");
-  // Il faut la copie ESM (index.js), celle qu'utilise @php-wasm/node : la copie
-  // CJS tiendrait un registre de runtimes séparé.
-  const universalEsm = path.join(path.dirname(universalCjs), "index.js");
-  const universal = await import(pathToFileURL(fs.existsSync(universalEsm) ? universalEsm : universalCjs).href);
+  // @php-wasm/node est lui-même ESM ou CJS selon sa version, et il importe
+  // @php-wasm/universal par la même condition d'exports. Il faut charger ici
+  // LA MÊME copie (index.js ou index.cjs) : deux copies tiendraient chacune
+  // leur registre de runtimes (« Runtime with id 1 not found »).
+  const nodeEntry = req.resolve(wasmSpecifier);
+  const nodePkg = JSON.parse(fs.readFileSync(path.join(path.dirname(nodeEntry), "package.json"), "utf8"));
+  const nodeMain = nodePkg.main || "index.js";
+  const nodeCjs = /\.[cm]?js$/.test(nodeMain) && (/\.cjs$/.test(nodeMain) || (nodePkg.type !== "module" && !/\.mjs$/.test(nodeMain)));
+  const universalTwin = path.join(path.dirname(universalCjs), nodeCjs ? "index.cjs" : "index.js");
+  const universal = await import(pathToFileURL(fs.existsSync(universalTwin) ? universalTwin : universalCjs).href);
   const php = new universal.PHP(
     await wasmPkg.loadNodeRuntime("8.3", {
       emscriptenOptions: {

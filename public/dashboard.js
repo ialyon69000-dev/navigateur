@@ -9,6 +9,10 @@
  *   • editor  — rôle administrateur du projet : il gère la bande ET les
  *     messages que les utilisateurs lisent juste au-dessus.
  *
+ * Les messages, eux, n'ont qu'un seul auteur : la rédaction. Mais tout
+ * utilisateur connecté — lecteur comme éditeur — peut commenter chaque
+ * message (/api/comments), et retirer son propre commentaire.
+ *
  * Le libellé de rôle ne vient jamais d'une chaîne codée en dur : il passe par
  * OKNO.roleLabel() (dictionnaire RU/EN de i18n.js), comme tout le reste.
  */
@@ -25,6 +29,7 @@
 
   const ME_URL = "/api/auth/me";
   const MESSAGES_URL = "/api/messages";
+  const COMMENTS_URL = "/api/comments";
   const DISPATCHES_URL = "/api/dispatches";
   const LOGOUT_URL = "/api/auth/logout";
 
@@ -36,9 +41,11 @@
     user: null,
     admin: false,
     messages: [],
+    comments: [],
     dispatches: [],
     fluxUpdatedAt: null,
     messagesError: false,
+    commentsError: false,
     editingMsgId: null,
     editingFluxId: null,
   };
@@ -185,6 +192,26 @@
     renderMessageStat();
   }
 
+  /** Commentaires : un seul appel, sans rendu — les cartes les dessinent. */
+  async function loadComments() {
+    try {
+      const { res, json } = await api(COMMENTS_URL);
+      if (!res.ok || !json || !Array.isArray(json.items)) throw new Error("comments: " + res.status);
+      state.comments = json.items;
+      state.commentsError = false;
+    } catch (e) {
+      console.error("OKNO comments", e);
+      state.comments = [];
+      state.commentsError = true; // un serveur muet doit se voir
+    }
+  }
+
+  /** Après une écriture (message ou commentaire) : commentaires puis cartes. */
+  async function refreshMessages() {
+    await loadComments();
+    await loadMessages();
+  }
+
   function visibleMessages() {
     return state.admin ? state.messages : state.messages.filter((m) => m && m.active !== false);
   }
@@ -220,7 +247,94 @@
       <h4 class="msg-title">${esc(title)}</h4>
       ${body ? `<p class="msg-body">${esc(body)}</p>` : ""}
       ${by ? `<p class="msg-by">${esc(by)}</p>` : ""}
+      ${commentsBlockHtml(m)}
     </article>`;
+  }
+
+  /* ——— commentaires : tout utilisateur connecté (lecteur ou éditeur) ——— */
+
+  function commentsOf(id) {
+    return state.comments
+      .filter((c) => c && c.messageId === id)
+      .sort((a, b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
+  }
+
+  function commentHtml(c) {
+    // Chacun retire son propre commentaire ; la rédaction modère l'ensemble.
+    const deletable = state.user && (state.admin || c.author === state.user.login);
+    return `<div class="comment-item">
+      <p class="comment-meta">${esc(c.author || "—")} · ${esc(fmtTimeAgo(c.updatedAt || c.createdAt))}</p>
+      <p class="comment-text">${esc(c.body)}</p>
+      ${deletable ? `<button type="button" class="btn-mini danger" data-act="comment-del" data-id="${esc(c.id)}">${esc(T("dash.msg-delete"))}</button>` : ""}
+    </div>`;
+  }
+
+  function commentsBlockHtml(m) {
+    const list = commentsOf(m.id);
+    const empty = state.commentsError ? T("dash.network-error") : T("dash.comments-empty");
+    return `<div class="msg-comments" data-msgid="${esc(m.id)}">
+      <p class="msg-comments-title">${esc(T("dash.comments-count", list.length))}</p>
+      ${list.length
+        ? `<div class="comments-list">${list.map(commentHtml).join("")}</div>`
+        : `<p class="comments-empty">${esc(empty)}</p>`}
+      <form class="comment-form" data-msgid="${esc(m.id)}">
+        <textarea class="comment-input" name="comment" rows="2" maxlength="600" required
+          aria-label="${esc(T("dash.comment-placeholder"))}"
+          placeholder="${esc(T("dash.comment-placeholder"))}"></textarea>
+        <div class="form-actions">
+          <button type="submit" class="btn-mini">${esc(T("dash.comment-send"))}</button>
+          <p class="form-status comment-status" role="status"></p>
+        </div>
+      </form>
+    </div>`;
+  }
+
+  async function submitComment(ev) {
+    const form = ev.target && ev.target.closest ? ev.target.closest("form.comment-form") : null;
+    if (!form) return;
+    ev.preventDefault();
+    const msgId = form.getAttribute("data-msgid");
+    const input = form.querySelector("textarea[name='comment']");
+    const status = form.querySelector(".comment-status");
+    const body = input ? input.value.trim() : "";
+    if (!body) {
+      if (status) status.textContent = T("dash.comment-need-text");
+      return;
+    }
+    const btn = form.querySelector("button[type='submit']");
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = T("dash.saving");
+    try {
+      // Le serveur prend l'auteur dans la session : rien d'autre n'est envoyé.
+      await send(COMMENTS_URL, { messageId: msgId, body });
+      await refreshMessages();
+    } catch (e) {
+      if (status) {
+        status.textContent = String(e.message || T("dash.save-error"));
+        status.className = "form-status comment-status err";
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function commentCardClick(ev) {
+    const btn = ev.target && ev.target.closest ? ev.target.closest("button[data-act='comment-del']") : null;
+    if (!btn) return;
+    ev.preventDefault();
+    const id = btn.getAttribute("data-id");
+    if (!id || !window.confirm(T("dash.comment-confirm"))) return;
+    const card = ev.target.closest ? ev.target.closest(".msg-comments") : null;
+    const status = card ? card.querySelector(".comment-status") : null;
+    try {
+      await send(COMMENTS_URL + "?id=" + encodeURIComponent(id), {}, "DELETE");
+      await refreshMessages();
+    } catch (e) {
+      if (status) {
+        status.textContent = String(e.message || T("dash.save-error"));
+        status.className = "form-status comment-status err";
+      }
+    }
   }
 
   /* ——— admin : édition des messages ——— */
@@ -288,7 +402,7 @@
       });
       setStatus("msg-status", T("dash.msg-saved"), "ok");
       fillMsgForm(null);
-      await loadMessages();
+      await refreshMessages();
     } catch (e) {
       setStatus("msg-status", String(e.message || T("dash.save-error")), "err");
     } finally {
@@ -320,7 +434,7 @@
         setStatus("msg-status", T("dash.msg-deleted"), "ok");
         if (state.editingMsgId === id) fillMsgForm(null);
       }
-      await loadMessages();
+      await refreshMessages();
     } catch (e) {
       setStatus("msg-status", String(e.message || T("dash.save-error")), "err");
     }
@@ -485,6 +599,13 @@
     if (msgReset) msgReset.addEventListener("click", () => fillMsgForm(null));
     const msgList = $("msg-admin-list");
     if (msgList) msgList.addEventListener("click", msgListClick);
+    // Les cartes de messages sont construites dynamiquement : deux écouteurs
+    // délégués suffisent pour tous les formulaires et boutons de commentaire.
+    const msgCards = $("msg-list");
+    if (msgCards) {
+      msgCards.addEventListener("submit", submitComment);
+      msgCards.addEventListener("click", commentCardClick);
+    }
     const fluxForm = $("flux-form");
     if (fluxForm) fluxForm.addEventListener("submit", submitFluxForm);
     const fluxReset = $("flux-reset");
@@ -513,6 +634,8 @@
     bindLang();
     const ok = await loadMe();
     if (!ok) return;
+    // D'abord les commentaires : les cartes des messages les dessinent.
+    await loadComments();
     await Promise.all([loadMessages(), loadDispatches()]);
   }
 
