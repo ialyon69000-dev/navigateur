@@ -28,7 +28,8 @@ api/
                        (UTF-8 toujours gagnant si valide, sinon windows-1251/koi8-r)
   visit.php            POST /api/visit
   visits.php           GET/DELETE /api/visits
-  health.php           GET  /api/health
+  health.php           GET  /api/health — sonde publique ; version de PHP et
+                       nombre de comptes seulement en session rédaction
   dispatches.php       GET  /api/dispatches — la bande et ses sources
                        POST /api/dispatches, DELETE ?id= — rédaction seulement
   messages.php         GET  /api/messages   — messages vus dans dashboard.html
@@ -125,7 +126,8 @@ api/auth/_auth.php      (schéma 2, erreurs d'écriture explicites)
 api/auth/challenge.php  (NOUVEAU)
 api/auth/login.php      (vérification du hash + migration)
 api/auth/register.php   (sel fourni par le navigateur)
-api/health.php          (diagnostic data/)
+api/health.php          (diagnostic data/ ; version de PHP et nombre de
+                         comptes uniquement en session rédaction)
 .htaccess               (réécriture /api/auth/challenge)
 ```
 
@@ -150,10 +152,10 @@ Puis **Ctrl+F5** dans le navigateur : le `.htaccess` met le JS en cache 1 h.
 
 ### Diagnostiquer en 10 secondes
 
-`https://tondomaine/api/health` doit renvoyer :
+`https://tondomaine/api/health` doit renvoyer, pour n'importe qui :
 
 ```json
-{"ok":true,"php":"8.2.x","data":{"dir":"writable","hint":null,"accounts":1}}
+{"ok":true,"time":"2026-09-05T12:00:00+00:00","data":{"dir":"writable","hint":null}}
 ```
 
 - `"dir":"readonly"` → **c'est la panne classique** : le serveur ne peut pas
@@ -161,6 +163,23 @@ Puis **Ctrl+F5** dans le navigateur : le `.htaccess` met le JS en cache 1 h.
   de login. Corriger : `chmod 777 data/` et `chmod 666 data/*.json`.
 - Une page HTML à la place du JSON → les `.php` ne sont pas exécutés
   (réécritures `.htaccess` absentes, ou fichiers non envoyés).
+
+La sonde est publique, donc elle reste muette sur la pile : `php` (la version de
+PHP) et `data.accounts` (le nombre de comptes) ne sortent **qu'en session
+rédaction** — le rôle `editor`/`admin`, les mêmes droits que pour écrire une
+dépêche. Ouvrir l'URL dans le navigateur après s'être connecté au tableau de
+bord suffit pour la vérification manuelle :
+
+```json
+{"ok":true,"time":"…","data":{"dir":"writable","hint":null,"accounts":1},"php":"8.2.x"}
+```
+
+En ligne de commande, avec le cookie copié des DevTools (le cookie est
+`HttpOnly`, il ne se lit donc que dans Application → Cookies) :
+
+```bash
+curl -s -H 'Cookie: okno-session=okno-…' https://tondomaine/api/health
+```
 
 ### Mot de passe perdu / compte admin
 
@@ -265,7 +284,8 @@ php -S localhost:8000
 # http://localhost:8000/robots.php       → robots.txt (en local, /robots.txt ne marche pas)
 # http://localhost:8000/sitemap.php      → sitemap.xml
 # http://localhost:8000/llms.php         → llms.txt (?full=1 avec les dépêches)
-# http://localhost:8000/api/health
+# http://localhost:8000/api/health       → {"ok":true,…} (les détails internes
+#   demandent le cookie de session d'un compte « editor »)
 # http://localhost:8000/auth/login.html
 ```
 

@@ -251,7 +251,9 @@ php -S localhost:8000
 **Deploy manuel (FileZilla/FileManager) :**
 1. Upload `infinityfree/htdocs/*` → `htdocs/`
 2. chmod 777 `data/`, 666 les fichiers `data/*.json`
-3. Test `/api/health`
+3. Test `/api/health` → `{"ok":true,…}`. La sonde est publique et n'expose donc
+   pas la version de PHP : `php` et `data.accounts` n'apparaissent qu'en session
+   rédaction (voir `infinityfree/README_INFINITYFREE.md`).
 
 ## Autres déploiements
 

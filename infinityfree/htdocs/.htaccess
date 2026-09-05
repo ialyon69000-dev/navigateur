@@ -44,6 +44,10 @@ RewriteRule ^api/comments$ api/comments.php [L,QSA]
     Header set Referrer-Policy "no-referrer"
     Header set X-Content-Type-Options "nosniff"
     Header set Permissions-Policy "geolocation=(self)"
+    # Même logique que app.disable("x-powered-by") côté Node : PHP ajoute tout
+    # seul « X-Powered-By: PHP/8.x » à chaque réponse, y compris à /api/health.
+    Header unset X-Powered-By
+    Header always unset X-Powered-By
 </IfModule>
 
 # Cache static assets 1h

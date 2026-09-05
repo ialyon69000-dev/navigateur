@@ -28,7 +28,9 @@ if (!runner.request) {
     const healthBody = JSON.parse(health.body);
     assert.equal(healthBody.ok, true);
     assert.equal(healthBody.data.dir, "writable");
-    assert.equal(healthBody.data.accounts, 1, "le compte seed « okno » est présent");
+    // un appelant anonyme ne reçoit ni la version de PHP ni le nombre de comptes
+    assert.equal(healthBody.php, undefined, "PHP_VERSION n'est pas public");
+    assert.equal(healthBody.data.accounts, undefined, "le nombre de comptes n'est pas public");
 
     // ——— challenge : sel du compte seed ———
     const chalSeed = await runner.request("api/auth/challenge.php", { query: { login: "okno" } });
@@ -166,6 +168,7 @@ if (!runner.request) {
       return;
     }
     try {
+      // le diagnostic reste public : c'est toute l'utilité de la sonde
       const health = await runner.request("api/health.php");
       assert.equal(JSON.parse(health.body).data.dir, "readonly");
       assert.match(JSON.parse(health.body).data.hint, /chmod 777/);
@@ -523,5 +526,52 @@ if (runner.request) {
     const cascade = await runner.request("api/messages.php", { method: "DELETE", query: { id: "m_2" }, cookie: adminCookie });
     assert.equal(cascade.status, 200, cascade.body);
     assert.equal(JSON.parse(await runner.read("data/comments.json")).some((c) => c.messageId === "m_2"), false, "commentaires du message supprimé nettoyés");
+  });
+}
+
+if (runner.request) {
+  test("health : version de PHP et nombre de comptes réservés à la rédaction", async () => {
+    const pwd = "Sonde!2026";
+    const mk = (id, login, role) => {
+      const salt = "salt-" + id;
+      const h1 = clientHash(pwd, salt);
+      return { id, login, hash: nodeSha(h1 + salt), salt, scheme: 2, createdAt: "2026-08-01T00:00:00Z", role, _h1: h1 };
+    };
+    const editor = mk("u_h_editor", "sonde-redac", "editor");
+    const lectrice = mk("u_h_reader", "sonde-lecteur", "reader");
+    runner.write(
+      "data/users.json",
+      JSON.stringify([editor, lectrice].map(({ _h1, ...u }) => u), null, 2),
+    );
+
+    const cookieFor = async (u) => {
+      const r = await runner.request("api/auth/login.php", { method: "POST", body: { login: u.login, hash: u._h1 } });
+      assert.equal(r.status, 200, r.body);
+      return "okno-session=" + runner.cookieOf(r, "okno-session");
+    };
+    const editorCookie = await cookieFor(editor);
+    const readerCookie = await cookieFor(lectrice);
+
+    const bodyOf = async (opts) => JSON.parse((await runner.request("api/health.php", opts)).body);
+
+    // ——— anonyme : la sonde répond, mais ne décrit pas la pile ———
+    const anon = await bodyOf({});
+    assert.equal(anon.ok, true, "la sonde répond pareil aux deux niveaux");
+    assert.equal(anon.data.dir, "writable");
+    assert.equal(anon.php, undefined, "pas de PHP_VERSION sans session");
+    assert.equal(anon.data.accounts, undefined, "pas de nombre de comptes sans session");
+
+    // ——— lecteur authentifié : rien de plus (le détail suit le droit d'écrire) ———
+    const asReader = await bodyOf({ cookie: readerCookie });
+    assert.equal(asReader.php, undefined, "un lecteur n'a pas la version de PHP");
+    assert.equal(asReader.data.accounts, undefined, "un lecteur n'a pas le nombre de comptes");
+
+    // ——— rédaction connectée : la vérification manuelle a ses deux champs ———
+    const asEditor = await bodyOf({ cookie: editorCookie });
+    assert.match(asEditor.php, /^\d+\.\d+\./, "la version de PHP, elle, sort bien en session rédaction");
+    assert.equal(asEditor.data.accounts, 2, "et le nombre de comptes avec");
+    // la sonde elle-même ne change pas de réponse selon qui l'appelle
+    assert.equal(asEditor.ok, anon.ok);
+    assert.equal(asEditor.data.dir, anon.data.dir);
   });
 }
