@@ -415,6 +415,7 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "authapi.err.bad-salt": { ru: "Неверный формат соли.", en: "Invalid salt format." },
     "authapi.err.login-length": { ru: "Логин от 3 до 40 знаков.", en: "Login must be 3 to 40 characters." },
     "authapi.err.taken": { ru: "Этот логин уже занят.", en: "This login is already taken." },
+    "authapi.err.locked": { ru: "Слишком много попыток входа. Подождите немного.", en: "Too many sign-in attempts. Please wait a moment." },
 
     // dashboard
     "dash.title": { ru: "Личный кабинет", en: "Dashboard" },

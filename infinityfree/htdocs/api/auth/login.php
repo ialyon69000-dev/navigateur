@@ -21,9 +21,12 @@ if (!auth_valid_client_hash($hash)) {
     ], 400);
 }
 
+auth_login_reject_if_blocked($login);
+
 $users = auth_read_users();
 list($idx, $found) = auth_find_user($users, $login);
 if ($idx === null) {
+    auth_login_fail($login);
     auth_json(['ok' => false, 'error' => 'Неверный логин или пароль.'], 401);
 }
 
@@ -45,8 +48,11 @@ if (hash_equals($expected, $stored)) {
     }
     $migrated = true;
 } else {
+    auth_login_fail($login);
     auth_json(['ok' => false, 'error' => 'Неверный логин или пароль.'], 401);
 }
+
+auth_login_ok($login);
 
 $sessions = auth_read_sessions();
 $sid = auth_gen_session_id();

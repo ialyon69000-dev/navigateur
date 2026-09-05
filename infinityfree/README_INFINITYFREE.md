@@ -40,13 +40,14 @@ api/
   auth/
     _auth.php          logique commune (cookie okno-session, sha256+sel, sessions)
     challenge.php      GET  /api/auth/challenge — donne le sel du compte
-    login.php          POST /api/auth/login
+    login.php          POST /api/auth/login (compteur anti-brute force)
     register.php       POST /api/auth/register
     me.php             GET  /api/auth/me
     logout.php         POST /api/auth/logout
 data/
   users.json           comptes (seed : éditeur « okno »)
   sessions.json        sessions actives
+  login_attempts.json  compteur d'échecs de connexion (anti-brute force)
   visits.json          journal des visites
   dispatches.json      dépêches de la bande (sources : visibles par la rédaction)
   messages.json        messages affichés par la rédaction dans le tableau de bord
@@ -102,6 +103,10 @@ connecter personne.
 Les comptes créés avant (schéma 1 : `hash = sha256(mot_de_passe + sel)`) sont
 **migrés automatiquement** au premier login réussi, sans jamais recevoir le mot
 de passe en clair — le navigateur calcule lui-même l'ancien hash.
+
+Cinq échecs d'affilée pour le même couple IP + login bloquent les tentatives
+suivantes (HTTP 429) pendant 15 minutes ; une connexion réussie remet le
+compteur à zéro (`data/login_attempts.json`).
 
 Garde-fous côté page : le formulaire est en `method="post"` et son
 `onsubmit="return window.OKNO_AUTH_READY === true"` bloque tout envoi natif si

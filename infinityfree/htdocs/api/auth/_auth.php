@@ -18,10 +18,13 @@
 $AUTH_DATA_DIR = __DIR__ . '/../../data';
 $AUTH_USERS_FILE = $AUTH_DATA_DIR . '/users.json';
 $AUTH_SESSIONS_FILE = $AUTH_DATA_DIR . '/sessions.json';
+$AUTH_ATTEMPTS_FILE = $AUTH_DATA_DIR . '/login_attempts.json';
 $AUTH_COOKIE = 'okno-session';
 $AUTH_TTL_S = 24 * 60 * 60; // 24 h
 $AUTH_SCHEME = 2;          // schéma de hachage courant
 $AUTH_SALT_RE = '/^[A-Za-z0-9._-]{1,64}$/';
+$AUTH_LOGIN_MAX_FAILS = 5;           // au-delà : HTTP 429
+$AUTH_LOGIN_WINDOW_S = 15 * 60;      // le compteur retombe après 15 min d'inactivité
 
 function auth_json_headers() {
     header('Content-Type: application/json; charset=utf-8');
@@ -262,5 +265,92 @@ function auth_reject_cleartext($body) {
             'error' => 'Старая версия скрипта входа. Обновите страницу (Ctrl+F5) и попробуйте снова.',
             'reason' => 'cleartext-password',
         ], 400);
+    }
+}
+
+/* ——— Compteur anti-brute force (login.php) ———
+ *
+ * Un entier par couple (IP, login). 5 échecs d'affilée → les suivantes
+ * sont refusées (HTTP 429) jusqu'à 15 minutes sans nouvelle tentative,
+ * ou jusqu'à une connexion réussie qui remet le compteur à zéro.
+ */
+
+function auth_client_ip() {
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) return trim($_SERVER['HTTP_CF_CONNECTING_IP']);
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        return trim($parts[0]);
+    }
+    if (!empty($_SERVER['HTTP_X_REAL_IP'])) return trim($_SERVER['HTTP_X_REAL_IP']);
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string)$_SERVER['REMOTE_ADDR'] : '';
+    if (strpos($ip, '::ffff:') === 0) $ip = substr($ip, 7);
+    if ($ip === '::1') $ip = '127.0.0.1';
+    return $ip;
+}
+
+function auth_attempts_key($login) {
+    return auth_client_ip() . '|' . auth_strtolower(trim((string)$login));
+}
+
+function auth_read_attempts() {
+    global $AUTH_ATTEMPTS_FILE;
+    $data = auth_read_json($AUTH_ATTEMPTS_FILE, []);
+    return (is_array($data) && !isset($data[0])) ? $data : [];
+}
+
+function auth_write_attempts($attempts) {
+    global $AUTH_ATTEMPTS_FILE, $AUTH_LOGIN_WINDOW_S;
+    $now = time();
+    $kept = [];
+    if (is_array($attempts)) {
+        foreach ($attempts as $k => $row) {
+            if (!is_array($row)) continue;
+            $t = isset($row['t']) ? (int)$row['t'] : 0;
+            if ($now - $t <= $AUTH_LOGIN_WINDOW_S) $kept[$k] = $row;
+        }
+    }
+    return auth_write_json($AUTH_ATTEMPTS_FILE, $kept);
+}
+
+/** @return array{0:int,1:array,2:string}  [n, store, key] — n = 0 si la fenêtre est close */
+function auth_login_attempts($login) {
+    global $AUTH_LOGIN_WINDOW_S;
+    $key = auth_attempts_key($login);
+    $all = auth_read_attempts();
+    if (!isset($all[$key]) || !is_array($all[$key])) return [0, $all, $key];
+    $t = isset($all[$key]['t']) ? (int)$all[$key]['t'] : 0;
+    if (time() - $t > $AUTH_LOGIN_WINDOW_S) {
+        unset($all[$key]);
+        return [0, $all, $key];
+    }
+    $n = isset($all[$key]['n']) ? (int)$all[$key]['n'] : 0;
+    return [$n, $all, $key];
+}
+
+function auth_login_reject_if_blocked($login) {
+    global $AUTH_LOGIN_MAX_FAILS, $AUTH_LOGIN_WINDOW_S;
+    list($n, $all, $key) = auth_login_attempts($login);
+    if ($n < $AUTH_LOGIN_MAX_FAILS) return;
+    $t = isset($all[$key]['t']) ? (int)$all[$key]['t'] : time();
+    $retry = max(1, $AUTH_LOGIN_WINDOW_S - (time() - $t));
+    header('Retry-After: ' . $retry);
+    auth_json([
+        'ok' => false,
+        'error' => 'Слишком много попыток входа. Подождите немного.',
+        'reason' => 'too-many-attempts',
+    ], 429);
+}
+
+function auth_login_fail($login) {
+    list($n, $all, $key) = auth_login_attempts($login);
+    $all[$key] = ['n' => $n + 1, 't' => time()];
+    auth_write_attempts($all);
+}
+
+function auth_login_ok($login) {
+    list($n, $all, $key) = auth_login_attempts($login);
+    if (isset($all[$key])) {
+        unset($all[$key]);
+        auth_write_attempts($all);
     }
 }

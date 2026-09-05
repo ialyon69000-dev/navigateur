@@ -125,6 +125,35 @@ test("version Node : compte ancien au sel exotique (espaces, cyrillique)", async
   assert.equal(login.json.migrated, true);
 });
 
+test("version Node : compteur anti-brute force (5 échecs puis 429)", async () => {
+  const salt = client.randomSalt(8);
+  const hash = await client.hashPassword("bon-mot-de-passe", salt);
+  const bad = nodeSha("mauvais-mot-de-passe" + salt);
+  const reg = await post("/api/auth/register", { login: "cible-brute", salt, hash });
+  assert.equal(reg.status, 201, reg.text);
+
+  for (let i = 0; i < 5; i++) {
+    const r = await post("/api/auth/login", { login: "cible-brute", hash: bad });
+    assert.equal(r.status, 401, "essai " + (i + 1) + " : " + r.text);
+  }
+
+  const locked = await post("/api/auth/login", { login: "cible-brute", hash: bad });
+  assert.equal(locked.status, 429, locked.text);
+  assert.equal(locked.json.reason, "too-many-attempts");
+  assert.match(locked.json.error, /Слишком много попыток/);
+  assert.ok(locked.headers.get("retry-after"), "Retry-After est posé");
+
+  const evenGood = await post("/api/auth/login", { login: "cible-brute", hash });
+  assert.equal(evenGood.status, 429, evenGood.text);
+
+  const otherSalt = client.randomSalt(8);
+  const otherHash = await client.hashPassword("autre-secret", otherSalt);
+  const otherReg = await post("/api/auth/register", { login: "voisin-brute", salt: otherSalt, hash: otherHash });
+  assert.equal(otherReg.status, 201, otherReg.text);
+  const otherLogin = await post("/api/auth/login", { login: "voisin-brute", hash: otherHash });
+  assert.equal(otherLogin.status, 200, otherLogin.text);
+});
+
 after(() => {
   server.closeAllConnections && server.closeAllConnections();
   server.close();
