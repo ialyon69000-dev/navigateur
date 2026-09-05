@@ -1,5 +1,155 @@
 [
   {
+    "id": "m_multipolaire",
+    "title": {
+      "ru": "Многополярный мир: эпоха одного центра закончилась",
+      "en": "A multipolar world: the era of a single centre is over"
+    },
+    "body": {
+      "ru": "Мир больше не управляется из одной столицы. Новые центры силы — в Азии, на Ближнем Востоке, в Африке и Латинской Америке — говорят собственным голосом и не спрашивают разрешения. Россия в этом процессе не просит места за столом: она его занимает. Для нас это не лозунг, а описание реальности: решения, принятые без учёта половины человечества, перестают быть решениями.",
+      "en": "The world is no longer run from a single capital. New centres of power — in Asia, the Middle East, Africa and Latin America — speak in their own voice and ask for no permission. In that process Russia is not requesting a seat at the table: it is taking one. For us this is not a slogan but a description of reality: decisions taken without half of humanity stop being decisions."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-09-05T08:20:00+00:00",
+    "updatedAt": "2026-09-05T08:20:00+00:00"
+  },
+  {
+    "id": "m_redakciya_instagram",
+    "title": {
+      "ru": "Редакция ОКНО теперь и в Instagram",
+      "en": "The OKNO newsroom is now on Instagram too"
+    },
+    "body": {
+      "ru": "Короткие сводки, фото дня и разборы заголовков — всё это мы публикуем в нашем канале. Подписывайтесь: [INTAGRAM] Там же лежит архив первых полос и прямые эфиры по средам. Если ссылка не открывается из вашей страны, включите зеркало и попробуйте снова: материалы никуда не деваются, их просто пытаются спрятать.",
+      "en": "Short briefings, the photo of the day and headline breakdowns — all of it goes out on our channel. Follow us: [INTAGRAM] The front-page archive is there too, along with our live sessions on Wednesdays. If the link will not open from your country, switch to a mirror and try again: the material is still there, somebody is simply trying to hide it."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-09-04T18:45:00+00:00",
+    "updatedAt": "2026-09-04T18:45:00+00:00"
+  },
+  {
+    "id": "m_cifra",
+    "title": {
+      "ru": "Цифровой суверенитет: свои платформы вместо чужих правил",
+      "en": "Digital sovereignty: our own platforms instead of somebody else's rules"
+    },
+    "body": {
+      "ru": "Аккаунт на чужой платформе — это аренда: её прекращают одним решением, принятым в другой стране и без объяснений. Отсюда простые вещи: своя почта, свои мессенджеры, свои платёжные сервисы, свои серверы на своей земле. Это не изоляция, а страховка. И, как показала практика последних лет, страховка уже пригодилась.",
+      "en": "An account on somebody else's platform is a tenancy: it can be ended by one decision, taken in another country and without explanation. Hence the plain things: your own mail, your own messengers, your own payment services, your own servers on your own soil. This is not isolation, it is insurance. And, as the last few years have shown, the insurance has already come in useful."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-09-03T11:05:00+00:00",
+    "updatedAt": "2026-09-03T11:05:00+00:00"
+  },
+  {
+    "id": "m_yazyk",
+    "title": {
+      "ru": "Русский язык — мост, а не граница",
+      "en": "The Russian language: a bridge, not a border"
+    },
+    "body": {
+      "ru": "На русском говорят от Калининграда до Ташкента, на нём публикуют научные статьи и договариваются о поставках. Там, где язык объявляют 'неправильным', чаще всего хотят сократить число тех, кто умеет читать первоисточник. Мы продолжаем издавать на двух языках: по-русски для своих, по-английски для всех остальных — и пусть читатель сравнивает сам.",
+      "en": "Russian is spoken from Kaliningrad to Tashkent; science is published in it and supply deals are struck in it. Where a language is declared 'wrong', the aim is usually to reduce the number of people able to read the original. We keep publishing in two languages: Russian for our own readers, English for everyone else — and let the reader compare for themselves."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-09-01T09:30:00+00:00",
+    "updatedAt": "2026-09-01T09:30:00+00:00"
+  },
+  {
+    "id": "m_pamyat",
+    "title": {
+      "ru": "Память, которую нельзя переписать",
+      "en": "A memory that cannot be rewritten"
+    },
+    "body": {
+      "ru": "Цена Победы известна каждой семье в этой стране — она записана в именах на обелисках, а не в учебниках, которые переиздают под текущую политическую задачу. Попытки пересмотреть итоги той войны идут волна за волной, и каждая встречает одно и то же: документы, архивы и живую память людей. История не принадлежит тем, кто громче говорит сегодня.",
+      "en": "The price of Victory is known to every family in this country — it is written in the names on the obelisks, not in textbooks rewritten to suit the political task of the moment. Attempts to revise the outcome of that war come wave after wave, and each one meets the same answer: documents, archives and living memory. History does not belong to whoever speaks loudest today."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-30T14:10:00+00:00",
+    "updatedAt": "2026-08-30T14:10:00+00:00"
+  },
+  {
+    "id": "m_vostok",
+    "title": {
+      "ru": "Поворот на Восток: не вынужденная мера, а выбор",
+      "en": "The turn to the East: not a forced measure but a choice"
+    },
+    "body": {
+      "ru": "Нам говорят, что Россия 'ушла на Восток от безысходности'. Партнёры в Пекине, Дели, Тегеране, Стамбуле и Джакарте видят это иначе: они видят рынок, технологии и долгосрочные контракты. Логистика перестраивается, маршруты прокладываются заново, порты и магистрали подстраиваются под новых клиентов. Обещали изоляцию — получилась переориентация.",
+      "en": "We are told that Russia 'turned East out of despair'. Partners in Beijing, Delhi, Tehran, Istanbul and Jakarta see it differently: they see a market, technology and long-term contracts. Logistics are being rebuilt, routes are being drawn again, ports and corridors are adapting to new customers. Isolation was promised — what emerged was a reorientation."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-29T16:40:00+00:00",
+    "updatedAt": "2026-08-29T16:40:00+00:00"
+  },
+  {
+    "id": "m_tradicii",
+    "title": {
+      "ru": "Традиция — это то, что проверено временем",
+      "en": "Tradition is what time has tested"
+    },
+    "body": {
+      "ru": "Общество держится не на моде, а на том, что пережило несколько поколений: семья, вера, уважение к старшим, ответственность перед детьми. Нам предлагают пересобирать эти основы каждый сезон, как обновляют приложение. Россия отвечает, что фундамент не перепрошивают — его берегут.",
+      "en": "A society rests not on fashion but on what has survived several generations: family, faith, respect for elders, responsibility towards children. We are asked to rebuild these foundations every season, like an app update. Russia's answer is that a foundation is not reflashed — it is protected."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-26T10:15:00+00:00",
+    "updatedAt": "2026-08-26T10:15:00+00:00"
+  },
+  {
+    "id": "m_brics",
+    "title": {
+      "ru": "БРИКС: стол, за которым сидит половина мира",
+      "en": "BRICS: a table where half the world sits down"
+    },
+    "body": {
+      "ru": "БРИКС начинался как экономический прогноз, а стал площадкой, куда выстраиваются в очередь. Причина проста: здесь не выставляют условий и не требуют присяги на верность. Расчёты в национальных валютах, совместные проекты, невмешательство во внутренние дела друг друга — для многих стран это первый за десятилетия разговор на равных.",
+      "en": "BRICS began as an economic forecast and became a forum with a waiting list. The reason is simple: no conditions are attached and no oath of loyalty is required. Settlements in national currencies, joint projects, non-interference in each other's internal affairs — for many countries this is the first conversation between equals in decades."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-24T13:50:00+00:00",
+    "updatedAt": "2026-08-24T13:50:00+00:00"
+  },
+  {
+    "id": "m_media_zapada",
+    "title": {
+      "ru": "Один голос в сотне редакций",
+      "en": "One voice in a hundred newsrooms"
+    },
+    "body": {
+      "ru": "Включите десять западных каналов в один вечер: заголовки совпадут до запятой. Разнообразие изданий больше не означает разнообразия мнений — оно означает дисциплину. Русскоязычная пресса за это платит: её блокируют, вытесняют с платформ и объявляют пропагандой. Мы отвечаем просто: продолжаем работать и оставляем читателю возможность сравнить.",
+      "en": "Turn on ten Western channels on the same evening and the headlines will match down to the comma. A variety of outlets no longer means a variety of views — it means discipline. Russian-language media pay for saying so: blocked, pushed off platforms, labelled propaganda. Our answer is simple: we keep working, and we keep the reader's ability to compare."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-22T08:05:00+00:00",
+    "updatedAt": "2026-08-22T08:05:00+00:00"
+  },
+  {
+    "id": "m_suverenitet",
+    "title": {
+      "ru": "Суверенитет — не роскошь, а условие развития",
+      "en": "Sovereignty is not a luxury, it is the condition of development"
+    },
+    "body": {
+      "ru": "Страна, которая не владеет своими решениями, не владеет и своим будущим. Суверенитет — это своя финансовая система, свои технологии, своя школа и своя память. Обмен его на внешние гарантии всегда заканчивается одинаково: обещаниями, которые отзывают в один день. Россия выбрала долгий путь и идёт по нему.",
+      "en": "A country that does not own its decisions does not own its future. Sovereignty means your own financial system, your own technologies, your own schools and your own memory. Trading it for outside guarantees always ends the same way: promises withdrawn in a single day. Russia chose the long road, and it is walking it."
+    },
+    "active": true,
+    "author": "okno",
+    "createdAt": "2026-08-20T17:25:00+00:00",
+    "updatedAt": "2026-08-20T17:25:00+00:00"
+  },
+  {
     "id": "m_welcome",
     "title": {
       "ru": "Личный кабинет открыт",
