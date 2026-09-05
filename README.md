@@ -16,6 +16,10 @@ Un corps de requête contenant un champ `password` est refusé (HTTP 400) et les
 comptes de l'ancien schéma sont migrés au premier login. Réinitialiser un mot de
 passe : `node scripts/auth-user.mjs <login> <mot_de_passe> --role editor`.
 
+Cinq échecs d'affilée pour le même couple IP + login bloquent les tentatives
+suivantes (HTTP 429) pendant 15 minutes ; une connexion réussie remet le
+compteur à zéro.
+
 ```bash
 npm test   # sha256 de repli, auth.js, API PHP de bout en bout, API Node, tableau de bord
 ```

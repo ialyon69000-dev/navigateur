@@ -185,6 +185,59 @@ if (!runner.request) {
 }
 
 if (runner.request) {
+  test("login.php : compteur anti-brute force (5 échecs puis 429)", async () => {
+    const salt = client.randomSalt(8);
+    const hash = await client.hashPassword("bon-mot-de-passe", salt);
+    const bad = clientHash("mauvais-mot-de-passe", salt);
+    const reg = await runner.request("api/auth/register.php", {
+      method: "POST",
+      body: { login: "cible-brute", salt, hash },
+    });
+    assert.equal(reg.status, 201, reg.body);
+
+    for (let i = 0; i < 5; i++) {
+      const r = await runner.request("api/auth/login.php", {
+        method: "POST",
+        body: { login: "cible-brute", hash: bad },
+      });
+      assert.equal(r.status, 401, "essai " + (i + 1) + " : " + r.body);
+      assert.equal(JSON.parse(r.body).ok, false);
+    }
+
+    const locked = await runner.request("api/auth/login.php", {
+      method: "POST",
+      body: { login: "cible-brute", hash: bad },
+    });
+    assert.equal(locked.status, 429, locked.body);
+    const lockedBody = JSON.parse(locked.body);
+    assert.equal(lockedBody.reason, "too-many-attempts");
+    assert.match(lockedBody.error, /Слишком много попыток/);
+    assert.match((locked.headers || []).join("\n"), /Retry-After/i);
+
+    // même le bon mot de passe est refusé tant que le compteur n'est pas retombé
+    const evenGood = await runner.request("api/auth/login.php", {
+      method: "POST",
+      body: { login: "cible-brute", hash },
+    });
+    assert.equal(evenGood.status, 429, evenGood.body);
+
+    // un autre login, même IP, n'est pas bloqué
+    const otherSalt = client.randomSalt(8);
+    const otherHash = await client.hashPassword("autre-secret", otherSalt);
+    const otherReg = await runner.request("api/auth/register.php", {
+      method: "POST",
+      body: { login: "voisin-brute", salt: otherSalt, hash: otherHash },
+    });
+    assert.equal(otherReg.status, 201, otherReg.body);
+    const otherLogin = await runner.request("api/auth/login.php", {
+      method: "POST",
+      body: { login: "voisin-brute", hash: otherHash },
+    });
+    assert.equal(otherLogin.status, 200, otherLogin.body);
+  });
+}
+
+if (runner.request) {
   test("scripts/auth-user.mjs : le compte généré permet vraiment de se connecter", async () => {
     const { buildUserRecord } = await import("../scripts/auth-user.mjs");
     const record = buildUserRecord("admin", "Nouveau!Mot2Passe", { role: "editor", id: "admin" });

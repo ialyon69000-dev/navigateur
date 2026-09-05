@@ -147,6 +147,31 @@ for (const source of ["public/auth/auth.js", "infinityfree/htdocs/auth/auth.js"]
     assert.equal(await attempt(), "Incorrect login or password.", "page en anglais → message traduit en anglais");
   });
 
+  test(`[${source}] un blocage anti-brute force (429) est traduit selon la langue de la page`, async () => {
+    const L10N = {
+      "authapi.err.locked": {
+        ru: "Слишком много попыток входа. Подождите немного.",
+        en: "Too many sign-in attempts. Please wait a moment.",
+      },
+    };
+    let lang = "en";
+    const fetcher = scriptedFetch([
+      { match: "/api/auth/challenge", response: { ok: true, salt: "sel-1" } },
+      {
+        match: "/api/auth/login",
+        status: 429,
+        response: { ok: false, error: "Слишком много попыток входа. Подождите немного.", reason: "too-many-attempts" },
+      },
+    ]);
+    const dom = loadAuth({ source, ids: LOGIN_IDS, fetch: fetcher.impl });
+    dom.window.OKNO = { t: (key) => (L10N[key] && L10N[key][lang]) || key };
+    dom.elements.login.value = "okno";
+    dom.elements.password.value = "mauvais";
+    dom.submit();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(dom.errorText(), "Too many sign-in attempts. Please wait a moment.");
+  });
+
   test(`[${source}] champs vides : message immédiat, aucune requête`, async () => {
     const fetcher = scriptedFetch([]);
     const dom = loadAuth({ source, ids: LOGIN_IDS, fetch: fetcher.impl });

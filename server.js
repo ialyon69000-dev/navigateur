@@ -104,8 +104,11 @@ app.use((req, res, next) => {
 // ——— Auth ———
 const AUTH_FILE = path.join(DATA_DIR, "users.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
+const ATTEMPTS_FILE = path.join(DATA_DIR, "login_attempts.json");
 const AUTH_COOKIE = "okno-session";
 const AUTH_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
+const LOGIN_MAX_FAILS = 5; // au-delà : HTTP 429
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // le compteur retombe après 15 min d'inactivité
 
 function ensureAuthFile() {
   if (!fs.existsSync(AUTH_FILE)) {
@@ -180,6 +183,78 @@ function rejectCleartext(body, res) {
     return true;
   }
   return false;
+}
+
+/* Compteur anti-brute force : un entier par couple (IP, login). 5 échecs
+ * d'affilée → HTTP 429 jusqu'à 15 minutes sans tentative, ou jusqu'à une
+ * connexion réussie qui remet le compteur à zéro. Identique à login.php. */
+function attemptsKey(ip, login) {
+  return String(ip || "") + "|" + String(login || "").trim().toLowerCase();
+}
+
+function readAttempts() {
+  try {
+    const raw = fs.readFileSync(ATTEMPTS_FILE, "utf8");
+    const data = JSON.parse(raw);
+    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAttempts(store) {
+  ensureDataFile();
+  const now = Date.now();
+  const kept = {};
+  for (const [k, row] of Object.entries(store || {})) {
+    if (!row || typeof row !== "object") continue;
+    const t = Number(row.t) || 0;
+    if (now - t <= LOGIN_WINDOW_MS) kept[k] = row;
+  }
+  const tmp = ATTEMPTS_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(kept, null, 2) + "\n", "utf8");
+  fs.renameSync(tmp, ATTEMPTS_FILE);
+}
+
+function loginAttempts(ip, login) {
+  const key = attemptsKey(ip, login);
+  const all = readAttempts();
+  const row = all[key];
+  if (!row || typeof row !== "object") return { n: 0, all, key };
+  const t = Number(row.t) || 0;
+  if (Date.now() - t > LOGIN_WINDOW_MS) {
+    delete all[key];
+    return { n: 0, all, key };
+  }
+  return { n: Number(row.n) || 0, all, key };
+}
+
+function rejectIfBlocked(req, res, login) {
+  const { n, all, key } = loginAttempts(clientIp(req), login);
+  if (n < LOGIN_MAX_FAILS) return false;
+  const t = Number((all[key] && all[key].t) || Date.now());
+  const retry = Math.max(1, Math.ceil((LOGIN_WINDOW_MS - (Date.now() - t)) / 1000));
+  res.setHeader("Retry-After", String(retry));
+  res.status(429).json({
+    ok: false,
+    error: "Слишком много попыток входа. Подождите немного.",
+    reason: "too-many-attempts",
+  });
+  return true;
+}
+
+function recordLoginFail(req, login) {
+  const { n, all, key } = loginAttempts(clientIp(req), login);
+  all[key] = { n: n + 1, t: Date.now() };
+  writeAttempts(all);
+}
+
+function recordLoginOk(req, login) {
+  const { all, key } = loginAttempts(clientIp(req), login);
+  if (all[key]) {
+    delete all[key];
+    writeAttempts(all);
+  }
 }
 
 function genSessionId() {
@@ -1257,9 +1332,11 @@ app.post("/api/auth/login", (req, res) => {
       reason: "bad-hash-format",
     });
   }
+  if (rejectIfBlocked(req, res, login)) return;
   const users = readUsers();
   const idx = users.findIndex((u) => u.login.toLowerCase() === login.toLowerCase());
   if (idx < 0) {
+    recordLoginFail(req, login);
     return res.status(401).json({ ok: false, error: "Неверный логин или пароль." });
   }
   const user = users[idx];
@@ -1277,8 +1354,10 @@ app.post("/api/auth/login", (req, res) => {
     writeUsers(users);
     migrated = true;
   } else {
+    recordLoginFail(req, login);
     return res.status(401).json({ ok: false, error: "Неверный логин или пароль." });
   }
+  recordLoginOk(req, login);
   const store = loadSessionStore();
   const sid = genSessionId();
   store[sid] = { userId: user.id, created: Date.now() };

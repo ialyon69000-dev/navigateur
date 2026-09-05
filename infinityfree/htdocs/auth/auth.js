@@ -33,6 +33,7 @@
     "неверный формат соли.": "authapi.err.bad-salt",
     "логин от 3 до 40 знаков.": "authapi.err.login-length",
     "этот логин уже занят.": "authapi.err.taken",
+    "слишком много попыток входа. подождите немного.": "authapi.err.locked",
   };
 
   function localizeServerError(msg) {
