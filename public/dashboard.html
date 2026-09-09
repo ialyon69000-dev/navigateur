@@ -177,6 +177,16 @@
       margin: 0;
       white-space: pre-wrap;
     }
+    /* Les liens du corps d'un message : le global « a { color: inherit } »
+       les rendrait invisibles, on les marque donc à l'encre rouge. */
+    .msg-body a {
+      color: var(--crimson-deep);
+      text-decoration: underline;
+      text-decoration-color: var(--gold);
+      text-underline-offset: 2px;
+      word-break: break-all;
+    }
+    .msg-body a:hover { color: var(--crimson); }
     .msg-by {
       font-family: var(--mono);
       font-size: 0.68rem;
@@ -584,6 +594,7 @@
         <label for="msg-body-en"><span data-i18n="dash.msg-f-body-en">Текст — английский</span>
           <textarea id="msg-body-en" name="body-en" rows="3" maxlength="1400"></textarea>
         </label>
+        <p class="dash-hint" data-i18n="dash.msg-f-links-hint">Ссылка в тексте: [подпись](https://…). Просто адрес — https://… — тоже станет кликабельным.</p>
         <label class="dash-check" for="msg-active">
           <input type="checkbox" id="msg-active" name="active" checked />
           <span data-i18n="dash.msg-f-active">Показать читателям</span>
