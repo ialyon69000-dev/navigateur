@@ -55,6 +55,37 @@
   const esc = (s) =>
     String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+  /* ——— liens cliquables dans le corps des messages ———
+   *
+   * Le corps d'un message reste du texte simple : il est toujours échappé, donc
+   * rien de ce que la rédaction tape n'est jamais interprété comme du HTML.
+   * Seule entorse, voulue : une adresse écrite à la façon Markdown
+   * (« [libellé](https://…) ») ou une adresse nue (« https://… ») devient un
+   * vrai lien cliquable. Le remplacement se fait APRÈS l'échappement et
+   * n'accepte que http(s) : « javascript: », « data: » et consorts restent du
+   * texte, et les guillemets étant déjà neutralisés, l'attribut href ne peut
+   * pas être refermé de l'extérieur.
+   */
+  const MD_LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  const BARE_URL = /(^|[\s(])(https?:\/\/[^\s<>()]+)/g;
+  const PUNCT = /[.,;:!?…]+$/;
+
+  const anchorHtml = (url, label) =>
+    `<a href="${url}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`;
+
+  function linkify(escaped) {
+    // 1. les liens Markdown, tels que la rédaction les écrit ;
+    let out = String(escaped).replace(MD_LINK, (_all, label, url) => anchorHtml(url, label));
+    // 2. les adresses nues. Celles déjà transformées sont collées à « href=" »
+    //    ou à « > », jamais précédées d'une espace ou d'une parenthèse : la
+    //    regex ne les reprend donc pas une seconde fois.
+    return out.replace(BARE_URL, (_all, before, url) => {
+      const tail = url.match(PUNCT);
+      const cut = tail ? url.slice(0, -tail[0].length) : url;
+      return `${before}${anchorHtml(cut, cut)}${tail ? tail[0] : ""}`;
+    });
+  }
+
   function fmtDate(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -245,7 +276,7 @@
         ${m.updatedAt ? `<time datetime="${esc(m.updatedAt)}">${esc(fmtDate(m.updatedAt))}</time>` : ""}
       </p>
       <h4 class="msg-title">${esc(title)}</h4>
-      ${body ? `<p class="msg-body">${esc(body)}</p>` : ""}
+      ${body ? `<p class="msg-body">${linkify(esc(body))}</p>` : ""}
       ${by ? `<p class="msg-by">${esc(by)}</p>` : ""}
       ${commentsBlockHtml(m)}
     </article>`;

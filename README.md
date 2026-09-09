@@ -60,6 +60,11 @@ commentaire ; la rédaction modère l'ensemble.
 Un message est bilingue : `{ title: { ru, en }, body: { ru, en }, active }`.
 L'utilisateur lit la langue qu'il a choisie (repli sur le russe si la version
 manque). Les brouillons (`active: false`) ne quittent jamais le serveur.
+Le corps est du texte simple, toujours échappé : aucun HTML saisi n'est
+interprété. Seule entorse, voulue : une adresse écrite à la façon Markdown —
+`[libellé](https://…)` — ou une adresse nue (`https://…`) devient un lien
+cliquable (`target="_blank"`, `rel="noopener noreferrer nofollow"`). Seules les
+adresses `http(s)` passent ; `javascript:` et consorts restent du texte.
 Un commentaire, lui, est un texte libre dans la langue que son auteur veut
 (jusqu'à 600 caractères, jamais de HTML). Stockage : `data/messages.json`,
 `data/comments.json` et `data/dispatches.json` (mêmes fichiers côté PHP).

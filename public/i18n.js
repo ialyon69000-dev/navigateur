@@ -483,6 +483,10 @@ const UK_FLAG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
     "dash.msg-f-title-en": { ru: "Заголовок — английский", en: "Headline — English" },
     "dash.msg-f-body-ru": { ru: "Текст — русский", en: "Text — Russian" },
     "dash.msg-f-body-en": { ru: "Текст — английский", en: "Text — English" },
+    "dash.msg-f-links-hint": {
+      ru: "Ссылка в тексте: [подпись](https://…). Просто адрес — https://… — тоже станет кликабельным.",
+      en: "A link in the text: [label](https://…). A bare address — https://… — becomes clickable too.",
+    },
     "dash.msg-f-active": { ru: "Показать читателям", en: "Show to readers" },
     "dash.msg-save": { ru: "Сохранить", en: "Save" },
     "dash.msg-reset": { ru: "Новое сообщение", en: "Start a new one" },

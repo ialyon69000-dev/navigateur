@@ -221,3 +221,88 @@ test("les rôles viennent du dictionnaire, jamais d'une chaîne en dur", () => {
   }
   assert.equal(ru[0], ru[1], "les deux copies de i18n.js doivent rester identiques");
 });
+
+/* ——— liens cliquables dans le corps des messages ———
+ *
+ * La rédaction écrit un lien à la façon Markdown — [libellé](https://…) — ou
+ * une adresse nue, et le lecteur obtient un vrai <a>. Le reste du texte reste
+ * du texte : le HTML tapé à la main est échappé, et seules les adresses http(s)
+ * deviennent des liens (jamais « javascript: »).
+ */
+const INSTAGRAM = "https://www.instagram.com/alexeikouzmetsov/";
+const LINKED = {
+  ok: true,
+  items: [
+    {
+      id: "m_liens",
+      title: { ru: "Редакция ОКНО теперь и в Instagram", en: "The OKNO newsroom is now on Instagram too" },
+      body: {
+        ru: `Подписывайтесь: [${INSTAGRAM}](${INSTAGRAM}) Архив: https://okno.example/archive. Текст <img src=x onerror=alert(1)> и [обман](javascript:alert(1)).`,
+        en: `Follow us: [${INSTAGRAM}](${INSTAGRAM}) Archive: https://okno.example/archive. Text <img src=x onerror=alert(1)> and [trick](javascript:alert(1)).`,
+      },
+      active: true,
+      author: "okno",
+      updatedAt: "2026-09-04T18:45:00Z",
+    },
+  ],
+};
+
+for (const prefix of ["public", "infinityfree/htdocs"]) {
+  test(`[${prefix}] un lien écrit par la rédaction devient cliquable, le HTML reste du texte`, async () => {
+    const page = loadPage({
+      i18n: `${prefix}/i18n.js`,
+      scripts: [`${prefix}/dashboard.js`],
+      classes: ADMIN_IDS,
+      lang: "ru",
+      routes: {
+        "/api/auth/me": { ok: true, user: { id: "u_1", login: "jean", role: "reader", createdAt: "2026-08-20T00:00:00Z" } },
+        "/api/messages": LINKED,
+        "/api/comments": { ok: true, items: [] },
+      },
+    });
+    await page.settle();
+
+    const cards = page.el("msg-list").innerHTML;
+    const anchor = `<a href="${INSTAGRAM}" target="_blank" rel="noopener noreferrer nofollow">${INSTAGRAM}</a>`;
+    assert.ok(cards.includes(anchor), "le lien Markdown est rendu comme un vrai <a>");
+    assert.ok(
+      cards.includes(`<a href="https://okno.example/archive" target="_blank" rel="noopener noreferrer nofollow">https://okno.example/archive</a>.`),
+      "une adresse nue devient un lien, sa ponctuation finale reste dehors"
+    );
+    assert.equal((cards.match(/<a href=/g) || []).length, 2, "deux liens, pas un de plus");
+
+    // le texte tapé n'est jamais interprété, et seul http(s) passe en href
+    assert.ok(cards.includes("&lt;img src=x onerror=alert(1)&gt;"), "le HTML saisi reste échappé");
+    assert.doesNotMatch(cards, /<img/i, "aucune balise injectée");
+    assert.doesNotMatch(cards, /href="javascript:/i, "« javascript: » ne devient pas un lien");
+    assert.match(cards, /\[обман\]\(javascript:alert\(1\)\)/, "le faux lien reste du texte brut");
+
+    // la langue change, le lien suit
+    page.setLang("en");
+    await page.settle(2);
+    assert.ok(page.el("msg-list").innerHTML.includes(anchor), "le lien survit au changement de langue");
+  });
+}
+
+test("messages.json : plus de balise [INTAGRAM], un vrai lien Instagram à la place", () => {
+  const files = ["data/messages.json", "infinityfree/htdocs/data/messages.json"];
+  const sources = [];
+  for (const rel of files) {
+    const src = fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
+    sources.push(src);
+    const parsed = JSON.parse(src);
+    assert.ok(Array.isArray(parsed) && parsed.length > 0, `${rel} se lit toujours comme une liste de messages`);
+    assert.doesNotMatch(src, /\[INTAGRAM\]/, `${rel} ne doit plus contenir la balise [INTAGRAM]`);
+    const insta = parsed.find((m) => m.id === "m_redakciya_instagram");
+    assert.ok(insta, `${rel} garde le message sur Instagram`);
+    for (const lang of ["ru", "en"]) {
+      assert.ok(
+        insta.body[lang].includes(
+          "[https://www.instagram.com/alexeikouzmetsov/](https://www.instagram.com/alexeikouzmetsov/)"
+        ),
+        `${rel} : le corps ${lang} porte le lien Instagram cliquable`
+      );
+    }
+  }
+  assert.equal(sources[0], sources[1], "les deux copies de messages.json doivent rester identiques");
+});
