@@ -8,8 +8,9 @@ portage 100% PHP dans `infinityfree/htdocs/`.
 ## Contenu de `infinityfree/htdocs/` (à mettre dans `htdocs/` du serveur)
 
 ```
-index.php, styles.css, app.js, i18n.js        frontend (drapeaux RU/EN, zone connexion) ;
-                                               index.php pré-rend les dépêches côté serveur
+index.php                                      PAGE DE MAINTENANCE (voir ci-dessous)
+maintenance.css, maintenance.js                mise en forme + bascule RU/EN de cette page
+styles.css, app.js, i18n.js                    frontend (drapeaux RU/EN, zone connexion)
 confidentialite.html, contacts.html,
 informations-juridiques.html, laboratoire.html pages statiques publiques (indexables)
 auth/login.html, auth/register.html,
@@ -55,6 +56,51 @@ data/
   news_cache.json      dernier instantané propre des flux (UTF-8)
   .htaccess            interdit l'accès direct au dossier
 ```
+
+## Page de maintenance (page d'accueil)
+
+`index.php` est actuellement la page **« Технические работы »** — le portage PHP
+de `public/index.html` (version Node). Les deux copies affichent la même chose,
+avec les mêmes `maintenance.css` / `maintenance.js` : titre bilingue, sélecteur
+RU/EN (drapeaux), manchette et statut de la rédaction.
+
+Portée : **la page d'accueil seulement**. `/contacts.html`,
+`/Legal-information.html`, `/confidentiality.html`, `/laboratoire.html`,
+`/auth/*`, `/dashboard.html` et toute l'API `/api/*` restent servis normalement
+— exactement comme sur la version Node.
+
+Deux choses que la version PHP fait en plus de la copie statique :
+
+- **la date et le numéro d'édition sont calculés côté serveur** (heure de
+  Moscou, comme `app.js`) : la manchette reste juste sans JavaScript et ne
+  vieillit pas si la maintenance dure ;
+- **aucune lecture de `data/`, aucun appel à `seo-lib.php`** : la page
+  s'affiche même si le cache des dépêches ou le dossier `data/` est en panne
+  — c'est justement le cas où l'on coupe le site. Elle est aussi servie en
+  `Cache-Control: no-store`, pour que le retour de l'édition soit immédiat.
+
+**Signaler l'indisponibilité aux moteurs** : la page est en
+`noindex, nofollow`. Si la maintenance dure plusieurs jours, préférer un vrai
+code HTTP 503 — décommenter dans `index.php` :
+
+```php
+http_response_code(503);
+header('Retry-After: 3600');
+```
+
+(À vérifier ensuite sur le serveur : certains hébergements gratuits remplacent
+les réponses 5xx par leur propre écran d'erreur.)
+
+**Revenir à l'édition normale** : `index.php` est versionné, donc
+
+```bash
+git log --oneline -- infinityfree/htdocs/index.php   # trouver la version « édition »
+git checkout <commit> -- infinityfree/htdocs/index.php
+```
+
+puis renvoyer `index.php` sur le serveur (FTP ou workflow de déploiement).
+`maintenance.css` / `maintenance.js` peuvent rester en place : plus rien ne les
+appelle.
 
 ### Différences / limitations InfinityFree
 1. **Cache** : pas de mémoire vive → `data/news_cache.json` avec TTL 5 min.
@@ -129,6 +175,13 @@ api/health.php          (diagnostic data/)
 .htaccess               (réécriture /api/auth/challenge)
 ```
 
+Page de maintenance :
+
+```
+index.php                                   (page « Технические работы »)
+maintenance.css, maintenance.js             (NOUVEAU — mise en forme + bascule RU/EN)
+```
+
 Rôles traduits + messages de la rédaction dans le tableau de bord :
 
 ```
@@ -192,6 +245,10 @@ npm test
   refus du mot de passe en clair, `data/` non inscriptible). Utilise le binaire
   `php` s'il est installé, sinon `@php-wasm/node` s'il est disponible.
 - `tests/node-api.test.mjs` — le même protocole contre `server.js`.
+- `tests/maintenance-page.test.mjs` — les deux pages de maintenance
+  (`public/index.html` et `infinityfree/htdocs/index.php`) disent mot pour mot
+  la même chose, chargent bien `maintenance.css`/`maintenance.js` (identiques
+  des deux côtés), et la version PHP ne lit ni `data/` ni le cache SEO.
 
 ## Déploiement — tout d'un coup via GitHub Actions (recommandé)
 
@@ -232,6 +289,12 @@ La home était en `noindex` et ses dépêches 100 % rendues en JavaScript :
 les robots (dont les aspirateurs de grands modèles de langage) ne voyaient
 qu'une page vide. Optimisations apportées :
 
+> ⚠️ **Pendant la maintenance**, la home est la page « Технические работы » :
+> elle est volontairement en `noindex` et ne pré-rend plus de dépêches. Les
+> points ci-dessous décrivent l'état à rétablir quand l'édition revient (voir
+> « Page de maintenance » plus haut) ; `/robots.txt`, `/sitemap.xml` et
+> `/llms.txt` continuent, eux, de fonctionner.
+
 - **`index.php` remplace `index.html`** (`.htaccess` met `DirectoryIndex index.php`) :
   le serveur **pré-rend les dépêches** dans le HTML (il lit `data/news_cache.json`),
   avec un `<h1>` et une balise `<article>` par dépêche. Les robots et les LLM
@@ -261,7 +324,7 @@ En local (`php -S`) le `.htaccess` ne réécrit pas — appeler directement
 ```bash
 cd infinityfree/htdocs
 php -S localhost:8000
-# http://localhost:8000/                 → index.php (dépêches pré-rendues + JSON-LD)
+# http://localhost:8000/                 → index.php (page de maintenance RU/EN)
 # http://localhost:8000/robots.php       → robots.txt (en local, /robots.txt ne marche pas)
 # http://localhost:8000/sitemap.php      → sitemap.xml
 # http://localhost:8000/llms.php         → llms.txt (?full=1 avec les dépêches)

@@ -230,7 +230,9 @@ Prête pour :
 
 **Contenu `infinityfree/htdocs/` = ce qu'il faut mettre dans `htdocs/` :**
 ```
-index.html, styles.css, app.js, i18n.js            (frontend)
+index.php                                           (page de maintenance RU/EN)
+maintenance.css, maintenance.js                     (mise en forme de cette page)
+styles.css, app.js, i18n.js                         (frontend)
 confidentialite/contacts/informations-juridiques/laboratoire.html
 auth/login.html, auth/register.html, auth/dispatches.html, dashboard.html
 vk.html + log.php                                   (exercice phishing)
