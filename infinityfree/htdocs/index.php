@@ -1,162 +1,134 @@
 <?php
-require_once __DIR__ . '/seo-lib.php';
-$newsItems = seo_news_items(60);
-$baseUrl = seo_base_url();
-// Pré-rendu pour les robots qui n'exécutent pas JavaScript (moteurs, LLM) :
-// le texte complet des dépêches est présent dans le HTML servi ; app.js le
-// remplace par l'édition mise en forme dès qu'il a chargé /api/news.
-$newsHtml = seo_news_html($newsItems, 40);
-$jsonLd = seo_home_jsonld($newsItems, 30);
+/**
+ * index.php — édition « Технические работы » (page de maintenance).
+ *
+ * Même page que la version Node (`public/index.html`), portée en PHP pour
+ * l'hébergement InfinityFree : mêmes textes bilingues RU/EN, même feuille de
+ * style (`maintenance.css`) et même script (`maintenance.js`), servis depuis
+ * `htdocs/`.
+ *
+ * Deux différences volontaires avec la copie statique, permises par PHP :
+ *   • la date de la manchette et le numéro d'édition sont calculés côté
+ *     serveur (heure de Moscou, comme app.js) : la page reste juste même sans
+ *     JavaScript, et ne vieillit pas si la maintenance dure ;
+ *   • la page n'ouvre aucun fichier de `data/` et n'inclut pas `seo-lib.php` :
+ *     elle s'affiche même si le cache des dépêches ou le dossier `data/` est
+ *     cassé — c'est précisément le cas où l'on coupe le site.
+ *
+ * Portée : la page d'accueil seulement. Les autres pages (contacts, mentions
+ * légales, /auth/*, dashboard) et l'API restent servies normalement.
+ *
+ * Pour revenir à l'édition : `git revert` du commit qui a introduit cette page
+ * (ou `git checkout <commit> -- infinityfree/htdocs/index.php`), puis renvoyer
+ * `index.php` sur le serveur.
+ */
+
+// Heure de la rédaction : Moscou, comme le reste du site (app.js).
+$now = new DateTime('now', new DateTimeZone('Europe/Moscow'));
+
+// Noms de mois en russe (génitif) : ni strftime (déprécié) ni l'extension
+// intl ne sont garantis sur un hébergement PHP gratuit.
+$moisRu = [
+    1 => 'января', 2 => 'февраля', 3 => 'марта', 4 => 'апреля',
+    5 => 'мая', 6 => 'июня', 7 => 'июля', 8 => 'августа',
+    9 => 'сентября', 10 => 'октября', 11 => 'ноября', 12 => 'декабря',
+];
+$dateIso = $now->format('Y-m-d');
+$dateRu  = $now->format('j') . ' ' . $moisRu[(int)$now->format('n')] . ' ' . $now->format('Y');
+$edition = '№ ' . $now->format('m') . '/' . $now->format('y');
+$annee   = $now->format('Y');
+
+header('Content-Type: text/html; charset=utf-8');
+// Jamais mise en cache : dès que l'édition revient, le visiteur la voit.
+header('Cache-Control: no-store, max-age=0');
+// Variante « SEO » : au lieu du <meta name="robots" content="noindex"> plus
+// bas, signaler aux moteurs une indisponibilité temporaire (recommandé si la
+// maintenance dure plusieurs jours). Vérifier ensuite que l'hébergeur ne
+// remplace pas la page par son propre écran d'erreur :
+// http_response_code(503);
+// header('Retry-After: 3600');
 ?><!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ОКНО — Revue internationale : les unes de la presse russe</title>
-  <meta name="description" content="ОКНО (OKNO) réunit en une seule édition les unes des grandes rédactions russes — ТАСС, РИА Новости, Лента.ру, Коммерсантъ, Известия, МК, Газета.Ru. Actualité russe et internationale, en russe et en anglais." />
-  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-  <link rel="canonical" href="<?php echo seo_h($baseUrl . '/'); ?>" />
-
-  <!-- Open Graph (partage + LLM) -->
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="ОКНО — Revue internationale" />
-  <meta property="og:title" content="ОКНО — les unes de la presse russe en une édition" />
-  <meta property="og:description" content="ТАСС, РИА Новости, Лента.ру, Коммерсантъ, Известия, МК, Газета.Ru — les unes des grandes rédactions russes, réunies en une édition bilingue (russe/anglais)." />
-  <meta property="og:url" content="<?php echo seo_h($baseUrl . '/'); ?>" />
-  <meta property="og:locale" content="ru_RU" />
-  <meta property="og:locale:alternate" content="en_US" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="ОКНО — Revue internationale" />
-  <meta name="twitter:description" content="Les unes des grandes rédactions russes, réunies en une édition (russe/anglais)." />
-
+  <title>ОКНО — Технические работы</title>
+  <meta name="description" content="ОКНО is currently undergoing scheduled maintenance." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#f4efe4" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314100c' width='32' height='32'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23c5a46e' font-family='serif'%3EО%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
-
-  <!-- Données structurées : NewsMediaOrganization + WebSite + ItemList de NewsArticle -->
-  <?php foreach ($jsonLd as $node): ?>
-  <script type="application/ld+json"><?php echo seo_json($node); ?></script>
-  <?php endforeach; ?>
+  <link rel="stylesheet" href="/maintenance.css" />
 </head>
-<body data-i18n-title="title.home">
+<body class="maintenance-page">
   <div class="paper-bg" aria-hidden="true"></div>
 
   <div class="lang-switch" role="group" aria-label="Language / Язык">
-    <button type="button" class="lang-btn" data-lang-btn="ru" aria-pressed="false"><img src="/images/ru.svg" alt="Русский" /></button>
-    <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="false"><img src="/images/en.svg" alt="English" /></button>
+    <button type="button" class="lang-btn is-active" data-language="ru" aria-label="Русский" aria-pressed="true"><img src="/images/ru.svg" alt="" /></button>
+    <button type="button" class="lang-btn" data-language="en" aria-label="English" aria-pressed="false"><img src="/images/en.svg" alt="" /></button>
   </div>
 
-  <header class="site-header">
+  <header class="maintenance-header">
     <div class="header-rail">
-      <span id="today"></span>
+      <span class="rail-copy" data-ru="Специальный выпуск" data-en="Special edition">Специальный выпуск</span>
+      <span class="rail-dot" aria-hidden="true"></span>
+      <time id="today" datetime="<?php echo $dateIso; ?>"><?php echo $dateRu; ?></time>
+      <span class="rail-dot" aria-hidden="true"></span>
+      <span><?php echo $edition; ?></span>
     </div>
 
-    <div class="header-meta">
-      <p class="update-timer" id="update-timer">
-        <span class="update-pulse" aria-hidden="true"></span>
-        <span data-i18n="rail.updated">Последнее обновление</span>
-        <time id="last-update">—</time>
-      </p>
-      <p class="auth-zone" id="auth-zone" aria-live="polite">
-        <a href="/auth/login.html" data-i18n="authzone.login">Войти</a>
-        <span class="rail-dot"></span>
-        <a href="/auth/register.html" data-i18n="authzone.register">Создать логин</a>
-      </p>
-    </div>
-
-    <a class="mast" href="/">
+    <a class="mast" href="/" aria-label="ОКНО — главная">
       <span class="mast-ornament" aria-hidden="true">✦</span>
-      <p class="mast-title">ОКНО</p>
-      <p class="mast-line" data-i18n="mast.tagline">Обозрение · Москва, Петербург, мир</p>
+      <h1 class="mast-title">ОКНО</h1>
+      <p class="mast-line" data-ru="Обозрение · Москва, Петербург, мир" data-en="Review · Moscow, Petersburg, the world">Обозрение · Москва, Петербург, мир</p>
       <span class="mast-ornament" aria-hidden="true">✦</span>
     </a>
 
-    <nav class="desk" aria-label="Rubriques">
-      <a href="#top" data-i18n="nav.top">Главное</a>
-      <a href="#monde" data-i18n="nav.monde">Мир</a>
-      <a href="#politique" data-i18n="nav.politique">Политика</a>
-      <a href="#economie" data-i18n="nav.economie">Экономика</a>
-      <a href="#societe" data-i18n="nav.societe">Общество</a>
-      <a href="#sport" data-i18n="nav.sport">Спорт</a>
-      <a href="#culture" data-i18n="nav.culture">Культура</a>
-      <a href="#fil" data-i18n="nav.fil">Лента</a>
-    </nav>
+    <div class="maintenance-rule" aria-hidden="true">
+      <span data-ru="Редакционное сообщение" data-en="Editorial notice">Редакционное сообщение</span>
+    </div>
   </header>
 
-  <div class="ticker" aria-hidden="true">
-    <div class="ticker-track" id="ticker"></div>
-  </div>
+  <main class="maintenance-main">
+    <section class="maintenance-card" aria-labelledby="maintenance-title">
+      <div class="status-line">
+        <span class="update-pulse" aria-hidden="true"></span>
+        <span data-ru="Технические работы" data-en="Maintenance in progress">Технические работы</span>
+      </div>
 
-  <main class="edition" id="news-root" aria-live="polite">
-    <section class="sr-edition">
-      <h1 class="sr-edition-title">Главное — свежий выпуск: главные новости России и мира от семи редакций</h1>
-      <p id="news-status" class="news-status" data-i18n="news.composing">Собираем выпуск…</p>
-<?php echo $newsHtml; ?>
+      <p class="issue-number" aria-hidden="true">01</p>
+      <h2 id="maintenance-title" data-ru="Мы скоро вернёмся" data-en="We’ll be back shortly">Мы скоро вернёмся</h2>
+      <p class="lead" data-ru="Сейчас редакция «ОКНО» проводит плановые технические работы, чтобы сделать издание быстрее, надёжнее и удобнее." data-en="The OKNO editorial team is carrying out scheduled maintenance to make the publication faster, more reliable and easier to use.">Сейчас редакция «ОКНО» проводит плановые технические работы, чтобы сделать издание быстрее, надёжнее и удобнее.</p>
+
+      <div class="ornament-divider" aria-hidden="true"><span>◆</span></div>
+
+      <p class="detail" data-ru="В это время материалы сайта временно недоступны. Спасибо за терпение — свежий выпуск уже готовится." data-en="During this time, the site’s articles are temporarily unavailable. Thank you for your patience — the next edition is already being prepared.">В это время материалы сайта временно недоступны. Спасибо за терпение — свежий выпуск уже готовится.</p>
+
+      <div class="return-note">
+        <span class="return-label" data-ru="Статус редакции" data-en="Editorial status">Статус редакции</span>
+        <strong data-ru="Работы идут по плану" data-en="Work is proceeding as planned">Работы идут по плану</strong>
+      </div>
     </section>
+
+    <aside class="side-note" aria-label="Information">
+      <span class="side-note-index">ОКНО / <?php echo $annee; ?></span>
+      <blockquote data-ru="«Небольшая пауза, чтобы лучше видеть мир»." data-en="“A short pause, so we can see the world more clearly.”">«Небольшая пауза, чтобы лучше видеть мир».</blockquote>
+      <p data-ru="Редакция ОКНО" data-en="The OKNO editorial team">Редакция ОКНО</p>
+    </aside>
   </main>
 
-  <footer class="media-footer" id="site-footer" lang="ru">
-    <div class="footer-inner">
-      <div class="footer-main">
-        <div class="footer-brand">
-          <a class="footer-logo" href="/" data-i18n="footer.home" data-i18n-attr="aria-label" data-i18n-attr-key="footer.home">ОКНО</a>
-          <p data-i18n="footer.tagline">Общественно-политическое обозрение</p>
-          <div class="footer-socials" role="group" aria-label="Мы в социальных сетях">
-            <a class="social-icon" href="https://www.facebook.com/profile.php?id=61593462840419" target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12.07C22 6.48 17.52 2 11.93 2S1.86 6.48 1.86 12.07c0 5.02 3.66 9.18 8.44 9.93v-7.03H7.9v-2.9h2.4V9.84c0-2.38 1.42-3.69 3.6-3.69 1.04 0 2.13.18 2.13.18v2.35h-1.2c-1.18 0-1.55.73-1.55 1.48v1.78h2.64l-.42 2.9h-2.22V22c4.78-.75 8.44-4.91 8.44-9.93z"/></svg>
-            </a>
-            <a class="social-icon" href="https://okho.ct.ws/vk.html" target="_blank" rel="noopener noreferrer" aria-label="VK" title="VK">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.78 18.05h1.4s.42-.05.64-.27c.2-.2.2-.56.2-.56s-.03-1.72.78-1.97c.8-.25 1.82 1.66 2.9 2.4.83.56 1.46.44 1.46.44l2.93-.04s1.53-.1.8-1.3c-.06-.1-.42-.88-2.16-2.5-1.82-1.68-1.58-1.41.62-4.32 1.34-1.77 2.48-3.5 2.48-3.5s.2-.4-.1-.64c-.28-.23-.85-.16-.85-.16l-3.12.02s-.23.03-.4.16c-.16.12-.27.4-.27.4s-.48 1.28-1.12 2.37c-1.35 2.3-1.89 2.42-2.11 2.28-.52-.33-.39-1.32-.39-2.02 0-2.2.33-3.11-.65-3.35-.32-.08-.56-.13-1.39-.14-1.06-.02-1.96 0-2.47.25-.34.17-.6.54-.44.56.2.03.65.12.89.42.3.4.3 1.28.3 1.28s.17 2.44-.4 2.75c-.4.21-.94-.22-2.11-2.2-.6-1.02-1.05-2.14-1.05-2.14s-.09-.22-.24-.34c-.18-.14-.44-.19-.44-.19l-2.96.02s-.44.13-.6.4c-.14.24.03.37.03.37s2.27 5.3 4.84 7.97c2.36 2.45 5.05 2.29 5.05 2.29z"/></svg>
-            </a>
-            <a class="social-icon" href="https://discord.com" target="_blank" rel="noopener noreferrer" aria-label="Discord" title="Discord">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.32 4.37A19.8 19.8 0 0 0 15.89 3l-.2.36a18.3 18.3 0 0 1 4.55 1.62 16.4 16.4 0 0 0-14.48 0A18.3 18.3 0 0 1 8.3 3.36L8.11 3A19.8 19.8 0 0 0 3.68 4.37C.96 8.47.22 12.45.5 16.38a19.9 19.9 0 0 0 6.05 3.07l.76-1.22a13 13 0 0 1-1.9-.9l.46-.36c3.67 1.74 7.65 1.74 11.28 0l.46.36c-.6.35-1.24.66-1.9.9l.76 1.22a19.9 19.9 0 0 0 6.05-3.07c.33-4.55-.57-8.5-3.3-12.01zM8.68 13.9c-1.18 0-2.15-1.08-2.15-2.4 0-1.33.95-2.41 2.15-2.41s2.17 1.09 2.15 2.41c0 1.32-.95 2.4-2.15 2.4zm6.64 0c-1.18 0-2.15-1.08-2.15-2.4 0-1.33.95-2.41 2.15-2.41s2.17 1.09 2.15 2.41c0 1.32-.95 2.4-2.15 2.4z"/></svg>
-            </a>
-          </div>
-        </div>
-
-        <nav class="footer-nav" aria-label="Разделы сайта">
-          <div class="footer-column">
-            <h2 data-i18n="footer.sections">Разделы</h2>
-            <a href="#top" data-i18n="nav.top">Главное</a>
-            <a href="#monde" data-i18n="nav.monde">Мир</a>
-            <a href="#politique" data-i18n="nav.politique">Политика</a>
-            <a href="#economie" data-i18n="nav.economie">Экономика</a>
-          </div>
-          <div class="footer-column">
-            <h2 data-i18n="footer.readers">Читателям</h2>
-            <a href="#societe" data-i18n="nav.societe">Общество</a>
-            <a href="#sport" data-i18n="nav.sport">Спорт</a>
-            <a href="#culture" data-i18n="nav.culture">Культура</a>
-            <a href="#fil" data-i18n="footer.all-news">Все новости</a>
-          </div>
-          <div class="footer-column">
-            <h2 data-i18n="footer.about">О редакции</h2>
-            <a href="/confidentiality.html" data-i18n="footer.privacy">Конфиденциальность</a>
-            <a href="/contacts.html" data-i18n="footer.contacts">Контакты</a>
-            <span data-i18n="footer.ad">Реклама</span>
-            <a href="/contacts.html" data-i18n="footer.feedback">Обратная связь</a>
-          </div>
-        </nav>
-      </div>
-
-
-
-      <div class="footer-legal">
-        <div>
-          <p data-i18n="legal.copy">© 2026 «ОКНО». Все права защищены.</p>
-          <p data-i18n="legal.disclaimer">Учебное сетевое издание. При использовании материалов ссылка на «ОКНО» обязательна.</p>
-        </div>
-        <div class="footer-legal-links">
-          <a href="/confidentiality.html" data-i18n="legal.privacy-policy">Политика конфиденциальности</a>
-          <a href="/Legal-information.html" data-i18n="legal.legal-info">Правовая информация</a>
-        </div>
-        <strong class="age-mark" data-i18n="legal.18" data-i18n-attr="aria-label" data-i18n-attr-key="legal.18" aria-label="Для лиц старше восемнадцати лет">18+</strong>
-      </div>
+  <footer class="maintenance-footer">
+    <div class="footer-line"></div>
+    <div class="maintenance-footer-inner">
+      <span>© <?php echo $annee; ?> «ОКНО»</span>
+      <span data-ru="Общественно-политическое обозрение" data-en="International news review">Общественно-политическое обозрение</span>
+      <span>18+</span>
     </div>
   </footer>
 
-  <script src="/i18n.js"></script>
-  <script src="/app.js"></script>
+  <script src="/maintenance.js"></script>
+</body>
 </html>

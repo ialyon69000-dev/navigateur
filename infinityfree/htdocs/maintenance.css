@@ -1,0 +1,113 @@
+/* Maintenance edition — uses the same paper, ink and editorial language as ОКНО. */
+.maintenance-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.maintenance-header {
+  width: min(100% - 2rem, 1120px);
+  margin: 0 auto;
+  padding-top: 1.15rem;
+}
+
+.maintenance-header .mast { padding-top: clamp(1.8rem, 5vh, 3.5rem); }
+.maintenance-header .mast-title { font-size: clamp(5.2rem, 16vw, 10.5rem); }
+
+.maintenance-rule {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 3px double var(--rule-strong);
+  padding: .48rem 0;
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: .66rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+.maintenance-rule::before,
+.maintenance-rule::after { content: ""; height: 1px; flex: 1; background: var(--rule); }
+
+.maintenance-main {
+  width: min(100% - 2rem, 1020px);
+  margin: auto;
+  padding: clamp(2.5rem, 7vh, 5rem) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(220px, .8fr);
+  gap: clamp(2rem, 7vw, 5.5rem);
+  align-items: center;
+}
+
+.maintenance-card { position: relative; border-left: 5px solid var(--crimson); padding: .25rem 0 .4rem clamp(1.5rem, 4vw, 3.2rem); }
+.status-line {
+  display: flex;
+  gap: .7rem;
+  align-items: center;
+  color: var(--crimson);
+  font-family: var(--mono);
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.issue-number {
+  position: absolute;
+  top: -2.3rem;
+  right: 0;
+  margin: 0;
+  color: rgba(176, 137, 62, .12);
+  font-family: var(--serif);
+  font-size: clamp(7rem, 16vw, 11rem);
+  line-height: 1;
+  font-weight: 700;
+  pointer-events: none;
+}
+.maintenance-card h2 {
+  position: relative;
+  margin: .75rem 0 1rem;
+  max-width: 720px;
+  font-family: var(--serif);
+  font-size: clamp(3rem, 7vw, 5.8rem);
+  font-weight: 600;
+  letter-spacing: -.035em;
+  line-height: .9;
+}
+.maintenance-card .lead {
+  position: relative;
+  max-width: 680px;
+  margin: 0;
+  color: var(--ink-2);
+  font-family: var(--serif);
+  font-size: clamp(1.25rem, 2.3vw, 1.65rem);
+  line-height: 1.35;
+}
+.ornament-divider { display: flex; align-items: center; gap: .8rem; width: min(100%, 520px); margin: 1.6rem 0; color: var(--gold); font-size: .55rem; }
+.ornament-divider::before, .ornament-divider::after { content: ""; height: 1px; flex: 1; background: var(--rule); }
+.detail { max-width: 590px; margin: 0; color: var(--mute); font-size: .9rem; line-height: 1.7; }
+.return-note { display: flex; flex-direction: column; gap: .2rem; margin-top: 1.65rem; }
+.return-label { color: var(--mute); font-family: var(--mono); font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; }
+.return-note strong { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+
+.side-note { border-top: 3px double var(--rule-strong); border-bottom: 1px solid var(--rule); padding: 1.2rem .15rem 1.35rem; }
+.side-note-index { color: var(--crimson); font-family: var(--mono); font-size: .62rem; letter-spacing: .15em; }
+.side-note blockquote { margin: 1.4rem 0 1rem; font-family: var(--serif); font-size: 1.45rem; font-style: italic; line-height: 1.25; }
+.side-note p { margin: 0; color: var(--mute); font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
+
+.maintenance-footer { width: min(100% - 2rem, 1120px); margin: 0 auto; padding-bottom: 1.3rem; }
+.footer-line { border-top: 1px solid var(--rule); border-bottom: 3px double var(--rule-strong); height: 5px; }
+.maintenance-footer-inner { display: flex; justify-content: space-between; gap: 1rem; padding-top: .75rem; color: var(--mute); font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; }
+
+@media (max-width: 740px) {
+  .maintenance-header { padding-top: .7rem; }
+  .maintenance-header .header-rail { padding-right: 4rem; justify-content: flex-start; }
+  .maintenance-main { grid-template-columns: 1fr; padding: 2.8rem 0 2rem; }
+  .side-note { display: none; }
+  .maintenance-card { padding-left: 1.25rem; }
+  .maintenance-card h2 { font-size: clamp(3rem, 15vw, 4.5rem); }
+  .maintenance-footer-inner span:nth-child(2) { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) { .status-line .update-pulse { animation: none; } }
