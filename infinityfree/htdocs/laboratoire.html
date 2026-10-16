@@ -42,6 +42,24 @@
     </p>
     <p id="visit-count" class="meta" data-i18n="lab.loading">Загрузка…</p>
 
+    <h2 class="kicker" style="margin-top:1.6rem" data-i18n="lab.crawlers">Обнаружение crawler</h2>
+    <p id="crawler-status" class="meta" data-i18n="crawler.loading">Проверка журнала…</p>
+    <p class="meta" data-i18n="crawler.caveat">Оценка эвристическая: User-Agent можно подделать, а IP может быть общим для многих людей.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="th.ip">IP</th>
+            <th data-i18n="th.crawler-status">Обнаружение</th>
+            <th data-i18n="th.crawler-reason">Основание</th>
+            <th data-i18n="th.visits">Визиты</th>
+            <th data-i18n="th.crawler-agent">User-Agent</th>
+          </tr>
+        </thead>
+        <tbody id="crawler-rows"></tbody>
+      </table>
+    </div>
+
     <div class="lab-actions">
       <button type="button" class="btn btn-ghost" id="btn-refresh" data-i18n="lab.refresh">Обновить</button>
       <button type="button" class="btn btn-solid" id="btn-download" data-i18n="lab.download">Скачать visits.json</button>
@@ -93,6 +111,7 @@
             <th data-i18n="th.network">Сеть</th>
             <th data-i18n="th.gps">GPS</th>
             <th data-i18n="th.tz">Часовой пояс</th>
+            <th data-i18n="th.crawler-status">Обнаружение crawler</th>
           </tr>
         </thead>
         <tbody id="visit-rows"></tbody>
@@ -104,7 +123,7 @@
   </main>
 
   <div id="toast" class="toast" hidden></div>
-  <script src="/i18n.js"></script>
-  <script src="/app.js"></script>
+  <script src="/i18n.js?v=20261016-crawler"></script>
+  <script src="/app.js?v=20261016-crawler"></script>
 </body>
 </html>
