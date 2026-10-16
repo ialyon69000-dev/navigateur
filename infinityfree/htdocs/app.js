@@ -825,10 +825,85 @@
 
   let labData = null;
 
+  // The server records the browser's request User-Agent with each visit.
+  // Combine that signal with explicit automation flags and repeated-IP activity;
+  // behavior-only matches stay "suspicious" to avoid calling shared IPs bots.
+  function detectCrawlerIps(visits) {
+    const groups = new Map();
+    const now = Date.now();
+    const knownBot = /googlebot|google-inspectiontool|bingbot|duckduckbot|yandexbot|baiduspider|slurp|applebot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-searchbot|perplexitybot|bytespider|amazonbot|facebookexternalhit|twitterbot|linkedinbot|telegrambot|discordbot|ahrefsbot|semrushbot|mj12bot|petalbot|ccbot|crawler|spider|\bbot\b/i;
+    const automation = /headlesschrome|phantomjs|puppeteer|playwright|selenium|webdriver|python-requests|scrapy|curl\/|wget\//i;
+
+    for (const visit of visits || []) {
+      const ip = String(visit?.ip || "").trim();
+      if (!ip) continue;
+      if (!groups.has(ip)) groups.set(ip, { ip, visits: 0, recent: 0, daily: 0, agents: new Map(), reasons: new Set(), level: "none" });
+      const group = groups.get(ip);
+      group.visits += 1;
+      const ua = String(visit.userAgent || "").trim();
+      if (ua) group.agents.set(ua, (group.agents.get(ua) || 0) + 1);
+      const time = Date.parse(visit.recordedAt || "");
+      if (Number.isFinite(time)) {
+        if (now - time >= 0 && now - time <= 15 * 60 * 1000) group.recent += 1;
+        if (now - time >= 0 && now - time <= 24 * 60 * 60 * 1000) group.daily += 1;
+      }
+      if (knownBot.test(ua)) {
+        const match = ua.match(/googlebot|google-inspectiontool|bingbot|duckduckbot|yandexbot|baiduspider|slurp|applebot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-searchbot|perplexitybot|bytespider|amazonbot|facebookexternalhit|twitterbot|linkedinbot|telegrambot|discordbot|ahrefsbot|semrushbot|mj12bot|petalbot|ccbot|crawler|spider|\bbot\b/i);
+        group.reasons.add("user-agent");
+        group.detectedAgent = match ? match[0] : "bot";
+        group.level = "known";
+      } else if (visit.webdriver === true || automation.test(ua)) {
+        group.reasons.add(visit.webdriver === true ? "webdriver" : "automation-ua");
+        if (group.level !== "known") group.level = "automation";
+      }
+    }
+
+    for (const group of groups.values()) {
+      if (group.level === "none" && (group.recent >= 8 || group.daily >= 25)) {
+        group.level = "behavior";
+        group.reasons.add(group.recent >= 8 ? "burst" : "volume");
+      }
+      group.userAgent = [...group.agents.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+    }
+    return [...groups.values()].filter((group) => group.level !== "none").sort((a, b) => b.visits - a.visits);
+  }
+
+  function crawlerLevelLabel(level) {
+    return T(`crawler.level-${level}`);
+  }
+
+  function crawlerReasonLabel(group) {
+    const reasons = [...group.reasons].map((reason) => T(`crawler.reason-${reason}`));
+    return reasons.join(" · ") || T("cell.dash");
+  }
+
+  function renderCrawlerTable(data) {
+    const rows = $("crawler-rows");
+    const status = $("crawler-status");
+    const crawlers = data.crawlers || [];
+    if (status) status.textContent = crawlers.length
+      ? T("crawler.found", crawlers.length)
+      : T("crawler.none");
+    if (!rows) return;
+    rows.innerHTML = "";
+    for (const crawler of crawlers) {
+      const tr = document.createElement("tr");
+      const values = [crawler.ip, crawlerLevelLabel(crawler.level), crawlerReasonLabel(crawler), String(crawler.visits), crawler.userAgent || T("cell.dash")];
+      values.forEach((value, index) => {
+        const td = document.createElement("td");
+        td.textContent = value;
+        if (index === 1) td.title = T("crawler.caveat");
+        tr.appendChild(td);
+      });
+      rows.appendChild(tr);
+    }
+  }
+
   function renderLabTable(data) {
     const tbody = $("visit-rows");
     const count = $("visit-count");
     const empty = $("lab-empty");
+    const crawlerByIp = new Map((data.crawlers || []).map((group) => [group.ip, group]));
     if (count) count.textContent = T("lab.count", data.total);
     if (tbody) {
       tbody.innerHTML = "";
@@ -854,6 +929,7 @@
             ? `${Number(v.geolocation.lat).toFixed(4)}, ${Number(v.geolocation.lon).toFixed(4)}`
             : T("cell.ip-only"),
           v.timezone || dash,
+          crawlerByIp.has(String(v.ip || "")) ? crawlerLevelLabel(crawlerByIp.get(String(v.ip)).level) : T("crawler.not-detected"),
         ];
         for (const c of cells) {
           const td = document.createElement("td");
@@ -971,8 +1047,10 @@
     async function refresh() {
       const res = await fetch("/api/visits");
       const data = await res.json();
+      data.crawlers = detectCrawlerIps(data.visits);
       labData = data;
       if (pre) pre.textContent = JSON.stringify(data.visits, null, 2);
+      renderCrawlerTable(data);
       renderLabTable(data);
       renderSummary(data);
     }
@@ -1002,6 +1080,7 @@
       }
       if (state.news.length) renderNews(state.news);
       if (labData) {
+        renderCrawlerTable(labData);
         renderLabTable(labData);
         renderSummary(labData);
       }

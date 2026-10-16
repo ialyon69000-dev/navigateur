@@ -302,7 +302,7 @@ function sanitizeVisit($body, $ip, $geo, $deviceId = null, $deviceConfirmed = fa
         ],
         'timezone' => clampStr($client['timezone'] ?? null, 60) ?: ($geo['timezone'] ?? null),
         'platform' => clampStr($client['platform'] ?? null, 80) ?: platformFromUa($client['userAgent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? '')),
-        'userAgent' => clampStr($client['userAgent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? ''), 350),
+        'userAgent' => clampStr($_SERVER['HTTP_USER_AGENT'] ?? ($client['userAgent'] ?? ''), 350),
         'hardwareConcurrency' => isset($client['hardwareConcurrency']) && is_numeric($client['hardwareConcurrency']) ? (int)$client['hardwareConcurrency'] : null,
         'deviceMemory' => isset($client['deviceMemory']) && is_numeric($client['deviceMemory']) ? (float)$client['deviceMemory'] : null,
         'maxTouchPoints' => isset($client['maxTouchPoints']) && is_numeric($client['maxTouchPoints']) ? (int)$client['maxTouchPoints'] : null,
